@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.venv-build/
+backend/build/
+backend/dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Node / 前端
+node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Rust / Tauri
+target/
+src-tauri/gen/
+src-tauri/binaries/
+
+# 系统
+.DS_Store
+
+# 本地配置（含密钥）
+myopencode.json

@@ -1,0 +1,1 @@
+"""myopencode 后端配置：schema 与 loader。"""

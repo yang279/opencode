@@ -1,0 +1,613 @@
+import { useState, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Button, Collapse, Input, Space, Tag, Typography } from "antd";
+import {
+  BulbOutlined,
+  LoadingOutlined,
+  UserOutlined,
+  RobotOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  WarningOutlined,
+  QuestionCircleOutlined,
+} from "@ant-design/icons";
+import type { ChatMessage, ThinkingEntry } from "../types/events";
+
+function Diff({ diff }: { diff: string }) {
+  if (!diff) return null;
+  const lines = diff.split("\n");
+  return (
+    <div className="diff-view">
+      {lines.map((l, i) => {
+        const cls = l.startsWith("+") ? "diff-add" : l.startsWith("-") ? "diff-del" : l.startsWith("@@") ? "diff-hunk" : "";
+        return (
+          <div key={i} className={cls}>
+            {l || " "}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function summarizeArgs(name: string, args?: Record<string, unknown>): string {
+  if (!args || Object.keys(args).length === 0) return "";
+  const pick =
+    name === "run_shell"
+      ? args.command
+      : name === "run_code"
+        ? args.code
+        : args.path ?? args.query ?? args.pattern;
+  let s: string;
+  if (pick !== undefined) {
+    s = String(pick);
+  } else {
+    const [k, v] = Object.entries(args)[0];
+    s = `${k}=${typeof v === "string" ? v : JSON.stringify(v)}`;
+  }
+  const one = s.replace(/\s+/g, " ").trim();
+  return one.length > 48 ? one.slice(0, 48) + "…" : one;
+}
+
+function ToolRow({ m }: { m: Extract<ChatMessage, { role: "tool" }> }) {
+  const status =
+    m.status === "running"
+      ? { icon: <span className="thinking-entry-dot running" style={{ display: "inline-block", marginTop: 0 }} />, color: "#b8562f" }
+      : m.status === "done"
+        ? { icon: <CheckOutlined />, color: "#8a857b" }
+        : m.status === "error"
+          ? { icon: <CloseOutlined />, color: "#c62828" }
+          : { icon: <CloseOutlined />, color: "#d97757" };
+  const summary = summarizeArgs(m.name, m.args);
+  return (
+    <div style={{ marginBottom: 4, opacity: m.status === "done" ? 0.85 : 1 }}>
+      <Collapse
+        ghost
+        size="small"
+        defaultActiveKey={[]}
+        items={[
+          {
+            key: m.id,
+            label: (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, width: "100%", minWidth: 0 }}>
+                <span style={{ color: status.color, fontSize: 12, flexShrink: 0 }}>{status.icon}</span>
+                <span
+                  style={{
+                    fontFamily: "SF Mono, Menlo, Consolas, monospace",
+                    fontSize: 12,
+                    color: "#6e6a63",
+                    fontWeight: 500,
+                    flexShrink: 0,
+                  }}
+                >
+                  {m.name}
+                </span>
+                {summary && (
+                  <span
+                    style={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      fontSize: 12,
+                      color: "#9a958c",
+                    }}
+                  >
+                    {summary}
+                  </span>
+                )}
+                {m.status === "rejected" && (
+                  <Tag color="warning" style={{ margin: 0, flexShrink: 0 }}>
+                    已拒绝
+                  </Tag>
+                )}
+              </span>
+            ),
+            children: (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingLeft: 2 }}>
+                {m.args && Object.keys(m.args).length > 0 && (
+                  <pre
+                    style={{
+                      margin: 0,
+                      fontSize: 12,
+                      color: "#6e6a63",
+                      whiteSpace: "pre-wrap",
+                      background: "#faf9f5",
+                      border: "1px solid #eeece3",
+                      borderRadius: 8,
+                      padding: "8px 10px",
+                    }}
+                  >
+                    {JSON.stringify(m.args, null, 2)}
+                  </pre>
+                )}
+                {m.status === "done" && m.result !== undefined && (
+                  <pre
+                    style={{
+                      whiteSpace: "pre-wrap",
+                      fontSize: 12,
+                      margin: 0,
+                      color: "#1f1e1d",
+                    }}
+                  >
+                    {m.result}
+                  </pre>
+                )}
+                {m.diff && <Diff diff={m.diff} />}
+              </div>
+            ),
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+function ApprovalCard({
+  m,
+  onRespond,
+}: {
+  m: Extract<ChatMessage, { role: "approval" }>;
+  onRespond: (id: string, decision: "once" | "always" | "reject") => void;
+}) {
+  const decided = m.status !== "pending";
+  const isShell = m.tool === "run_shell";
+  const command = isShell ? String(m.args.command ?? "") : "";
+
+  return (
+    <div
+      style={{
+        background: "#faf6ef",
+        border: "1px solid #ebd9c4",
+        borderLeft: "3px solid #d97757",
+        borderRadius: 12,
+        padding: "12px 14px",
+        marginBottom: 14,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <WarningOutlined style={{ color: "#d97757" }} />
+        <Typography.Text strong style={{ fontSize: 13 }}>
+          {m.tool}
+        </Typography.Text>
+        {decided && (
+          <Tag color={m.status === "rejected" ? "warning" : "success"} style={{ marginLeft: 4 }}>
+            {m.status === "rejected" ? "已拒绝" : "已允许"}
+          </Tag>
+        )}
+      </div>
+      {m.message && (
+        <Typography.Paragraph type="secondary" style={{ fontSize: 13, margin: "8px 0 0" }}>
+          {m.message}
+        </Typography.Paragraph>
+      )}
+      <pre
+        style={{
+          margin: "10px 0 0",
+          fontSize: 12,
+          color: "#1f1e1d",
+          whiteSpace: "pre-wrap",
+          background: "#ffffff",
+          border: "1px solid #eeece3",
+          borderRadius: 8,
+          padding: "8px 10px",
+        }}
+      >
+        {isShell ? command : JSON.stringify(m.args, null, 2)}
+      </pre>
+      {!decided && (
+        <Space style={{ marginTop: 12, justifyContent: "flex-end", width: "100%" }}>
+          <Button size="small" danger onClick={() => onRespond(m.id, "reject")}>
+            拒绝
+          </Button>
+          <Button size="small" onClick={() => onRespond(m.id, "once")}>
+            允许一次
+          </Button>
+          <Button size="small" type="primary" onClick={() => onRespond(m.id, "always")}>
+            总是允许
+          </Button>
+        </Space>
+      )}
+    </div>
+  );
+}
+
+function formatAnswer(a: string): string {
+  try {
+    const p = JSON.parse(a);
+    if (Array.isArray(p)) return p.join("、");
+  } catch {
+    // ignore
+  }
+  return a;
+}
+
+function AskUserCard({
+  m,
+  onAnswer,
+}: {
+  m: Extract<ChatMessage, { role: "ask_user" }>;
+  onAnswer: (id: string, answer: string) => void;
+}) {
+  const [value, setValue] = useState("");
+  const [selected, setSelected] = useState<string[]>([]);
+  const pending = m.status === "pending";
+  const multi = m.multi ?? false;
+  const options = (m.options ?? []).slice().sort(
+    (a, b) => Number(b.recommended ?? false) - Number(a.recommended ?? false),
+  );
+
+  const submitText = () => {
+    const t = value.trim();
+    if (!t) return;
+    onAnswer(m.id, t);
+    setValue("");
+  };
+
+  const pickOne = (label: string) => onAnswer(m.id, label);
+
+  const toggleMulti = (label: string) =>
+    setSelected((prev) =>
+      prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label],
+    );
+
+  const submitMulti = () => {
+    if (selected.length === 0) return;
+    onAnswer(m.id, JSON.stringify(selected));
+    setSelected([]);
+  };
+
+  return (
+    <div
+      style={{
+        background: "#faf6ef",
+        border: "1px solid #ebd9c4",
+        borderLeft: "3px solid #d97757",
+        borderRadius: 12,
+        padding: "12px 14px",
+        marginBottom: 14,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <QuestionCircleOutlined style={{ color: "#d97757", marginTop: 2, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, color: "#3f3c37", whiteSpace: "pre-wrap" }}>{m.question}</div>
+          {pending && options.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+              {options.map((o) => {
+                const active = multi && selected.includes(o.label);
+                const isRec = !!o.recommended;
+                return (
+                  <div
+                    key={o.label}
+                    onClick={() => (multi ? toggleMulti(o.label) : pickOne(o.label))}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "8px 10px",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      border: `1px solid ${active || isRec ? "#d97757" : "#eeece3"}`,
+                      background: active ? "#fdf1ec" : "#ffffff",
+                      transition: "border-color .15s",
+                    }}
+                  >
+                    {multi && (
+                      <span
+                        style={{
+                          color: active ? "#d97757" : "#b5b0a6",
+                          flexShrink: 0,
+                          fontSize: 12,
+                        }}
+                      >
+                        {active ? "●" : "○"}
+                      </span>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          fontWeight: isRec ? 600 : 400,
+                          color: "#1f1e1d",
+                        }}
+                      >
+                        {o.label}
+                      </div>
+                      {o.description && (
+                        <div style={{ fontSize: 12, color: "#8a857b", marginTop: 2 }}>
+                          {o.description}
+                        </div>
+                      )}
+                    </div>
+                    {isRec && (
+                      <Tag color="volcano" style={{ margin: 0, flexShrink: 0 }}>
+                        推荐
+                      </Tag>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {pending && multi && selected.length > 0 && (
+            <Button size="small" type="primary" style={{ marginTop: 10 }} onClick={submitMulti}>
+              提交所选（{selected.length}）
+            </Button>
+          )}
+          {pending ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <Input
+                size="small"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onPressEnter={submitText}
+                placeholder={options.length > 0 ? "或输入自定义回答…" : "输入回答…"}
+                autoFocus={options.length === 0}
+              />
+              <Button type="primary" size="small" onClick={submitText}>
+                发送
+              </Button>
+            </div>
+          ) : (
+            m.answer !== undefined && (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#8a857b", whiteSpace: "pre-wrap" }}>
+                你：{formatAnswer(m.answer)}
+              </div>
+            )
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SafetyCard({
+  m,
+  onDecision,
+}: {
+  m: Extract<ChatMessage, { role: "safety" }>;
+  onDecision: (id: string, decision: "continue" | "abort") => void;
+}) {
+  const pending = m.status === "pending";
+  return (
+    <div
+      style={{
+        background: "#fdf6f0",
+        border: "1px solid #f0d3b0",
+        borderLeft: "3px solid #e6a23c",
+        borderRadius: 12,
+        padding: "12px 14px",
+        marginBottom: 14,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+        <WarningOutlined style={{ color: "#e6a23c", marginTop: 2, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#7a4a1d" }}>检测到安全风险</div>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "#8a6a3f" }}>
+            {m.reasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
+          {pending ? (
+            <Space style={{ marginTop: 12 }}>
+              <Button size="small" danger onClick={() => onDecision(m.id, "abort")}>
+                取消执行
+              </Button>
+              <Button size="small" type="primary" onClick={() => onDecision(m.id, "continue")}>
+                仍然继续
+              </Button>
+            </Space>
+          ) : (
+            <Tag style={{ marginTop: 8 }} color={m.status === "allowed" ? "success" : "warning"}>
+              {m.status === "allowed" ? "已允许" : "已阻止"}
+            </Tag>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ContentFlag({ m }: { m: Extract<ChatMessage, { role: "content_flag" }> }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        fontSize: 12,
+        color: "#a15c00",
+        marginBottom: 12,
+      }}
+    >
+      <WarningOutlined style={{ color: "#e6a23c" }} />
+      <span>{m.message}</span>
+    </div>
+  );
+}
+
+function ThinkingRow({ entries, active }: { entries: ThinkingEntry[]; active: boolean }) {
+  if (entries.length === 0 && active) {
+    return (
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, color: "#b5b0a6", fontSize: 12 }}>
+        <span className="thinking-mini-dots">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span>思考中…</span>
+      </div>
+    );
+  }
+  if (entries.length === 0) return null;
+  const latestProgress = [...entries]
+    .reverse()
+    .find((e) => e.kind === "progress" && e.status === "running");
+  const headerText = active ? (latestProgress?.title ?? "思考中…") : "思考";
+  const timelineEntries = entries.filter((e) => e.kind !== "progress");
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <Collapse
+        ghost
+        size="small"
+        defaultActiveKey={[]}
+        items={[
+          {
+            key: "thinking",
+            label: (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#8a857b", fontSize: 12 }}>
+                <BulbOutlined style={{ fontSize: 12 }} />
+                {active && (
+                  <span className="thinking-mini-dots">
+                    <i />
+                    <i />
+                    <i />
+                  </span>
+                )}
+                <span>{headerText}</span>
+              </span>
+            ),
+            children: timelineEntries.length === 0 ? (
+              <span style={{ fontSize: 12, color: "#9a958c" }}>暂无更多细节</span>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  paddingTop: 2,
+                  paddingLeft: 12,
+                  borderLeft: "2px solid #eeece3",
+                }}
+              >
+                {timelineEntries.map((e) => (
+                  <div key={e.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
+                    <span className={`thinking-entry-dot ${e.status ?? ""}`} />
+                    <div style={{ minWidth: 0 }}>
+                      <span style={{ fontSize: 13, fontWeight: 450, color: "#6e6a63" }}>
+                        {e.title}
+                      </span>
+                      {e.detail && (
+                        <div style={{ fontSize: 12, color: "#9a958c", marginTop: 2 }}>{e.detail}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ),
+          },
+        ]}
+      />
+    </div>
+  );
+}
+
+export default function MessageList({
+  messages,
+  thinking = [],
+  thinkingActive = false,
+  onRespond,
+  onAnswer,
+  onSafety,
+}: {
+  messages: ChatMessage[];
+  thinking?: ThinkingEntry[];
+  thinkingActive?: boolean;
+  onRespond?: (id: string, decision: "once" | "always" | "reject") => void;
+  onAnswer?: (id: string, answer: string) => void;
+  onSafety?: (id: string, decision: "continue" | "abort") => void;
+}) {
+  if (messages.length === 0) {
+    return (
+      <div style={{ padding: "48px 8px", textAlign: "center" }}>
+        <div className="claude-logo" style={{ margin: "0 auto 20px", width: 44, height: 44, borderRadius: 14, fontSize: 30, lineHeight: "44px" }}>
+          *
+        </div>
+        <div className="serif" style={{ fontSize: 26, color: "#1f1e1d", fontWeight: 600 }}>
+          有什么可以帮你？
+        </div>
+        <div style={{ marginTop: 10, fontSize: 14, color: "#8a857b" }}>
+          让 Agent 读写文件、搜索代码、执行命令，帮你完成编程任务
+        </div>
+      </div>
+    );
+  }
+
+  const showThinking = thinking.length > 0 || thinkingActive;
+  let lastUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      lastUserIndex = i;
+      break;
+    }
+  }
+
+  const rows: ReactNode[] = [];
+  messages.forEach((m, i) => {
+    if (m.role === "tool") {
+      rows.push(<ToolRow key={m.id} m={m} />);
+      return;
+    }
+    if (m.role === "approval") {
+      rows.push(<ApprovalCard key={m.id} m={m} onRespond={onRespond ?? (() => {})} />);
+      return;
+    }
+    if (m.role === "ask_user") {
+      rows.push(<AskUserCard key={m.id} m={m} onAnswer={onAnswer ?? (() => {})} />);
+      return;
+    }
+    if (m.role === "safety") {
+      rows.push(<SafetyCard key={m.id} m={m} onDecision={onSafety ?? (() => {})} />);
+      return;
+    }
+    if (m.role === "content_flag") {
+      rows.push(<ContentFlag key={m.id} m={m} />);
+      return;
+    }
+    const isUser = m.role === "user";
+    rows.push(
+      <div
+        key={m.id}
+        style={{ display: "flex", alignItems: "flex-start", gap: 12, marginBottom: 22 }}
+      >
+        <div
+          style={{
+            flexShrink: 0,
+            width: 30,
+            height: 30,
+            borderRadius: "50%",
+            background: isUser ? "#e8e6dc" : "#d97757",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: isUser ? "#6e6a63" : "#fff",
+          }}
+        >
+          {isUser ? <UserOutlined /> : <RobotOutlined />}
+        </div>
+        <div style={{ flex: 1, minWidth: 0, paddingTop: 3 }}>
+          <div
+            className={isUser ? undefined : "markdown-body"}
+            style={{ color: "#1f1e1d", whiteSpace: isUser ? "pre-wrap" : undefined }}
+          >
+            {isUser ? (
+              <Typography.Text style={{ fontSize: 15 }}>{m.content}</Typography.Text>
+            ) : (
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
+            )}
+            {m.streaming && <LoadingOutlined style={{ marginLeft: 6, color: "#b8562f" }} />}
+          </div>
+        </div>
+      </div>,
+    );
+    if (i === lastUserIndex && showThinking) {
+      rows.push(<ThinkingRow key="thinking" entries={thinking} active={thinkingActive} />);
+    }
+  });
+
+  return <div>{rows}</div>;
+}

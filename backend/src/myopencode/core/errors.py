@@ -1,0 +1,21 @@
+"""结构化错误码：后端错误事件携带稳定 code，供前端映射文案与可操作提示。"""
+
+from __future__ import annotations
+
+
+class ErrorCode:
+    """错误码常量。以 str 直接输出给前端事件。"""
+
+    LLM_TIMEOUT = "LLM_TIMEOUT"
+    LLM_AUTH = "LLM_AUTH"
+    LLM_UNAVAILABLE = "LLM_UNAVAILABLE"
+    NO_PROVIDER = "NO_PROVIDER"
+    TOOL_DENIED = "TOOL_DENIED"
+    TOOL_ERROR = "TOOL_ERROR"
+    PATH_DENIED = "PATH_DENIED"
+    SANDBOX_UNAVAILABLE = "SANDBOX_UNAVAILABLE"
+    BUDGET_EXCEEDED = "BUDGET_EXCEEDED"
+    INTENT_FAILED = "INTENT_FAILED"
+    CANCELLED = "CANCELLED"
+    CONFIG_INVALID = "CONFIG_INVALID"
+    UNKNOWN = "UNKNOWN"

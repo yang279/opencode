@@ -1,0 +1,3 @@
+{"id": "list_dir_explore", "prompt": "看看这个目录里有什么文件", "expect_tools": ["list_dir"], "expect_ask_user": false}
+{"id": "read_file", "prompt": "读取 README.md 的内容", "expect_tools": ["read_file"], "expect_ask_user": false}
+{"id": "ask_user_choose", "prompt": "问用户 React 和 Vue 选哪个", "expect_tools": ["ask_user"], "expect_ask_user": true}
