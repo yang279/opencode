@@ -58,7 +58,8 @@ class Summarizer:
         user = transcript
         if prior_summary:
             user = "已有摘要：\n{}\n\n新的对话摘录：\n{}".format(prior_summary, transcript)
-        return await self._complete(system, user)
+        result = await self._complete(system, user)
+        return result or prior_summary
 
     async def summarize_session(self, messages: List[Message]) -> str:
         """会话结束：把整段会话总结成 episode 摘要。"""

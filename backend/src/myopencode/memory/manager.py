@@ -1,7 +1,7 @@
 """记忆编排：组装上下文（system 段 + 裁剪 messages）与会话结束固化。"""
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from ..config.schema import MemoryConfig
 from ..core import tracing
@@ -25,17 +25,23 @@ class MemoryManager:
         self.short_term = short_term
 
     async def build_context(
-        self, session: Session, system_prompt: str, skills_section: str
+        self,
+        session: Session,
+        system_prompt: str,
+        skills_section: str,
+        model: Optional[str] = None,
     ) -> Tuple[str, List[Message]]:
         """返回 (完整 system_prompt 文本, 发送给 LLM 的 messages)。"""
         with tracing.span("memory.build_context"):
             summary, messages = await self.short_term.compact(
-                session.messages, session.summary or ""
+                session.messages, session.summary or "", model=model
             )
         folded = len(session.messages) - len(messages)
         if folded > 0:
             session.summary = summary
             session.summary_compressed_count += folded
+            # 真正裁剪：移除已折叠消息，防止每轮重复摘要 + 持久化膨胀
+            session.messages = messages
 
         parts: List[str] = []
         if system_prompt:

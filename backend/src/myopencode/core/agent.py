@@ -766,7 +766,8 @@ class Agent:
     async def _build_messages(self, state: RunState, session: Session) -> List[Message]:
         if self._memory is not None:
             prompt, msgs = await self._memory.build_context(
-                session, self.config.system_prompt or "", self._skills_section
+                session, self.config.system_prompt or "", self._skills_section,
+                model=self.config.resolve_model(),
             )
         else:
             prompt = self.config.system_prompt or ""
