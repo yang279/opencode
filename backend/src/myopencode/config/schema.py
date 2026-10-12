@@ -133,6 +133,9 @@ class LLMConfig:
     per_request_max_tokens: Optional[int] = None
     # 预算超限时是否硬停当前任务（True=硬停，False=仅告警）
     budget_hard_stop: bool = True
+    # 模型路由：简单意图走更便宜的小模型（复用主 provider 连接，只换模型名）
+    lite_model: Optional[str] = None
+    simple_intents: List[str] = field(default_factory=lambda: ["question", "chat"])
 
 
 @dataclass

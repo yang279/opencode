@@ -40,7 +40,7 @@ from ..skills.load_skill_tool import LoadSkillTool
 from ..skills.registry import SkillRegistry, scan_skills
 from ..tools.registry import ToolRegistry
 from ..tools.sandbox import Sandbox
-from .routes import diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace
+from .routes import crash, diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace
 from .ws import manager, websocket_endpoint
 
 
@@ -173,6 +173,7 @@ def create_app(
     app.include_router(undo.router)
     app.include_router(usage_routes.router)
     app.include_router(diagnostics.router)
+    app.include_router(crash.router)
 
     @app.websocket("/ws")
     async def ws_route(ws: WebSocket) -> None:

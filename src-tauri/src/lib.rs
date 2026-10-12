@@ -1,5 +1,6 @@
 //! Tauri 壳层入口：注册命令、管理 sidecar 生命周期。
 
+pub mod crash;
 pub mod sidecar;
 
 use std::process::Child;
@@ -61,6 +62,7 @@ fn choose_directory(app: tauri::AppHandle) -> Option<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    crash::install_panic_hook();
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(BackendState::default())

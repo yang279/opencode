@@ -21,7 +21,7 @@ from ..core.observability import redact
 from ..intent.pipeline import IntentPipeline
 from ..llm.base import LLMProvider
 from ..llm.budget import BudgetExceededError
-from ..llm.registry import create_fallback_providers
+from ..llm.registry import create_fallback_providers, create_lite_provider
 from ..llm.retry import resilient_stream
 from ..security.policy import APPROVE_ALWAYS, REJECT, PermissionPolicy
 from ..security.safety import SEVERITY_HIGH, SEVERITY_MEDIUM
@@ -49,6 +49,18 @@ _ASK_USER_GUIDANCE = (
 
 # 事件发送回调：把事件 dict 推给前端
 EventSink = Callable[[Dict[str, Any]], Awaitable[None]]
+
+
+def route_provider(
+    lite_provider: Any,
+    main_provider: Any,
+    category: Optional[str],
+    simple_intents: List[str],
+) -> Any:
+    """按意图类别选择小模型或主模型；lite 未配置或非简单意图时回退主模型。"""
+    if lite_provider is not None and category and category in simple_intents:
+        return lite_provider
+    return main_provider
 
 
 @dataclass
@@ -105,6 +117,7 @@ class Agent:
         self._budget = budget
         self._budget_warned = False
         self._fallbacks = create_fallback_providers(config)
+        self._lite_provider = create_lite_provider(config)
         self._planner = Planner(provider, config.planning, config.llm, self._fallbacks)
         self._active_runs: Dict[str, RunState] = {}
 
@@ -117,6 +130,7 @@ class Agent:
     def set_config(self, config: AppConfig) -> None:
         self.config = config
         self._fallbacks = create_fallback_providers(config)
+        self._lite_provider = create_lite_provider(config)
         self._planner = Planner(self.provider, config.planning, config.llm, self._fallbacks)
 
     def set_intent(self, intent: Optional[IntentPipeline]) -> None:
@@ -133,6 +147,15 @@ class Agent:
 
     def set_reflexion(self, reflexion: Any) -> None:
         self._reflexion = reflexion
+
+    def _select_provider(self, state: RunState) -> Any:
+        """按当前意图类别选择主模型或小模型。"""
+        return route_provider(
+            self._lite_provider,
+            self.provider,
+            state.last_intent_category,
+            self.config.llm.simple_intents,
+        )
 
     async def _check_budget(self, session: Session) -> None:
         """LLM 调用前检查预算：超限硬停（或仅告警），接近上限告警。"""
@@ -478,7 +501,7 @@ class Agent:
             text_parts: List[str] = []
 
             async for ev in resilient_stream(
-                [self.provider, *self._fallbacks],
+                [self._select_provider(state), *self._fallbacks],
                 messages,
                 self.tools.schemas(state.active_tools),
                 self.config.llm,

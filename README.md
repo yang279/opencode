@@ -50,6 +50,21 @@ MYOPENCODE_TOKEN=dev-token MYOPENCODE_PORT=8787 .venv/bin/python -m myopencode
 cd backend && .venv/bin/pip install -e ".[providers]"
 ```
 
+### 模型路由（可选）
+
+配置 `llm.lite_model`（复用主 provider 的连接、只换模型名），简单意图（默认 `question` / `chat`）会自动走小模型，复杂任务走主模型；`llm.simple_intents` 可自定义意图列表。
+
+```json
+{
+  "llm": {
+    "lite_model": "qwen3.8-flash",
+    "simple_intents": ["question", "chat"]
+  }
+}
+```
+
+未配置 `lite_model` 时所有请求都走主模型（路由关闭）。
+
 ## Skills
 
 Agent 支持渐进式加载 Skill：启动时把每个 Skill 的「名称 + 描述」注入 system prompt，LLM 需要时调用 `load_skill` 工具读取完整正文。
@@ -144,6 +159,10 @@ cd backend && .venv/bin/python -m myopencode.evals.run_evals
 
 CI 已配置于 `.github/workflows/ci.yml`（ruff+pytest / npm build+test / cargo check 三路并行）。
 
+## 崩溃日志
+
+Rust 主进程 panic 与前端未捕获异常（`error` / `unhandledrejection`）都会写入 `~/.config/myopencode/logs/crash.log`（结构化、已脱敏），可在「工具与信息 → 诊断」导出或直接查看。
+
 ## 环境变量（开发）
 
 | 变量 | 默认 | 说明 |
@@ -154,31 +173,10 @@ CI 已配置于 `.github/workflows/ci.yml`（ruff+pytest / npm build+test / carg
 | `VITE_BACKEND_PORT` | `8787` | 前端直连端口 |
 | `VITE_BACKEND_TOKEN` | `dev-token` | 前端直连 token |
 
-## 当前进度
-
-### 核心
-- [x] Agent 主循环：ReAct + Reflexion（verifier/critique 重试）+ 循环内 `plan` / `delegate` 并行
-- [x] 工具集：read/write/edit_file、list_dir/glob/grep、run_shell/run_code、ask_user（单选/多选/自填）、load_skill，可扩展 MCP
-- [x] 交互：审批（命令 allow/deny + 写操作）、安全确认、`/undo`、`resume`、取消
-- [x] 意图识别 + skill 确定性触发（bigram 容错匹配）
-
-### 企业级能力
-- [x] 成本治理：日/月预算硬停、用量明细/聚合、账单 CSV 导出、告警 webhook
-- [x] 可观测：metrics / tracing / OTLP telemetry / 审计日志 / 诊断导出
-- [x] 记忆：短期滚动压缩（模型窗口对齐）+ 长期语义/场景记忆
-- [x] 安全：密钥进钥匙串、命令策略、sandbox（container/seatbelt/pathguard）、内容/工具结果扫描、secret 脱敏、数据 at-rest 加密（AES-256-GCM）
-
-### 工程质量
-- [x] 后端：ruff + pytest（含 agent 集成测试、加密、预算、评测判定器）
-- [x] 前端：vitest + testing-library（MessageList 状态）
-- [x] CI：GitHub Actions（ruff+pytest / npm build+test / cargo check）
-- [x] evals：黄金集 + 规则判定器 + 离线运行器
-
 ## 待办（下一步可做）
 
-- [ ] 模型路由（成本/质量：简单任务走小模型、复杂走大模型）
 - [ ] RAG / 知识库 + 语义缓存
-- [ ] 崩溃上报（Sentry）+ 自动更新（Tauri updater）
+- [ ] 自动更新（Tauri updater）
 - [ ] MCP 远程 transport（SSE / streamable HTTP）
 - [ ] `edit_file` diff 的可视化渲染增强
 - [ ] 依赖漏洞扫描 / SBOM、CI 接入 secret scan（gitleaks）

@@ -70,6 +70,18 @@ def create_fallback_providers(config: AppConfig) -> list:
     return out
 
 
+def create_lite_provider(config: AppConfig):
+    """模型路由用的小模型 provider：复用主 provider 连接，只换模型名。
+
+    `config.llm.lite_model` 未配置时返回 None（路由关闭，全走主模型）。
+    """
+    if not config.llm.lite_model:
+        return None
+    name = config.resolve_provider()
+    pc = config.providers.get(name, ProviderConfig())
+    return create_named_provider(name, pc, config.llm.lite_model)
+
+
 def create_summary_provider(config: AppConfig) -> LLMProvider:
     """为摘要任务构造 provider：优先独立摘要模型，否则回退主 provider。"""
     mc = config.memory

@@ -226,4 +226,10 @@ export const api = {
       `/traces${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
     ),
   diagnosticsExportUrl: async () => `${await httpBase()}/diagnostics/export`,
+  reportCrash: (payload: { message: string; stack?: string; source?: string }) =>
+    request<{ ok: boolean }>("/crash", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    }),
 };

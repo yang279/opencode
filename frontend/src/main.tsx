@@ -3,7 +3,25 @@ import ReactDOM from "react-dom/client";
 import { ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
 import App from "./App";
+import { api } from "./lib/api";
 import "./styles.css";
+
+function reportCrash(message: string, stack?: string, source?: string) {
+  api
+    .reportCrash({ message, stack, source })
+    .catch(() => {});
+}
+
+window.addEventListener("error", (e) => {
+  reportCrash(e.message || "unknown error", e.error?.stack, "window");
+});
+
+window.addEventListener("unhandledrejection", (e) => {
+  const reason = e.reason;
+  const message = reason instanceof Error ? reason.message : String(reason);
+  const stack = reason instanceof Error ? reason.stack : undefined;
+  reportCrash(message, stack, "unhandledrejection");
+});
 
 const fontFamily =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif';
