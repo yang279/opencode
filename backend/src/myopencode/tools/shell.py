@@ -31,6 +31,8 @@ class ShellTool:
 
     async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> ToolResult:
         command = args.get("command", "")
+        if ctx.sandbox is not None and ctx.sandbox.disabled:
+            return ToolResult(output=ctx.sandbox.disabled_reason(), error=True)
         timeout = int(args.get("timeout", 30))
         argv: List[str] = self._argv(command, ctx)
         kw: Dict[str, Any] = dict(

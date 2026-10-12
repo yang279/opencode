@@ -23,6 +23,7 @@ from ..llm.base import LLMProvider
 from ..llm.budget import BudgetExceededError
 from ..llm.registry import create_fallback_providers, create_lite_provider
 from ..llm.retry import resilient_stream
+from ..llm.usage import begin_delegate_cost, end_delegate_cost
 from ..security.policy import APPROVE_ALWAYS, REJECT, PermissionPolicy
 from ..security.safety import SEVERITY_HIGH, SEVERITY_MEDIUM
 from ..memory.manager import MemoryManager
@@ -37,6 +38,28 @@ from .planner import Planner
 from .session import ApprovalItem, Message, QuestionItem, SafetyItem, Session
 
 _logger = logging.getLogger("myopencode.agent")
+
+
+def _repair_interrupted(session: Session) -> bool:
+    """回退中断时残留的不完整工具轮。
+
+    若最后一条带 tool_calls 的 assistant 消息后面没有齐全的工具结果（中断于
+    发出工具调用或部分执行后），删除该 assistant 及其后的残留，使 resume 回到干净状态。
+    返回是否发生了回退。
+    """
+    msgs = session.messages
+    for i in range(len(msgs) - 1, -1, -1):
+        m = msgs[i]
+        if m.role == "assistant" and m.tool_calls:
+            call_ids = {tc.get("id") for tc in m.tool_calls if tc.get("id")}
+            resolved = {
+                t.tool_call_id for t in msgs[i + 1:] if t.role == "tool" and t.tool_call_id
+            }
+            if call_ids.issubset(resolved):
+                return False
+            del msgs[i:]
+            return True
+    return False
 
 # 主循环提问约定：需要用户输入时先用 ask_user 并立即停下，不先跑工具/答题
 _ASK_USER_GUIDANCE = (
@@ -120,6 +143,7 @@ class Agent:
         self._lite_provider = create_lite_provider(config)
         self._planner = Planner(provider, config.planning, config.llm, self._fallbacks)
         self._active_runs: Dict[str, RunState] = {}
+        self._llm_semaphore = self._build_semaphore(config)
 
     # ── 热更新支持（PUT /config 时切换 provider / config / intent）──
     # policy/sandbox/backup 不再作为实例态缓存，改为每次 run 从 config 现建，
@@ -132,6 +156,12 @@ class Agent:
         self._fallbacks = create_fallback_providers(config)
         self._lite_provider = create_lite_provider(config)
         self._planner = Planner(self.provider, config.planning, config.llm, self._fallbacks)
+        self._llm_semaphore = self._build_semaphore(config)
+
+    @staticmethod
+    def _build_semaphore(config: AppConfig) -> Optional[asyncio.Semaphore]:
+        limit = config.llm.max_concurrent_calls
+        return asyncio.Semaphore(limit) if limit > 0 else None
 
     def set_intent(self, intent: Optional[IntentPipeline]) -> None:
         self._intent = intent
@@ -265,6 +295,12 @@ class Agent:
                 session,
                 E.degraded("沙箱已降级到 pathguard（无 OS 隔离），请检查 Docker/sandbox-exec"),
             )
+        if (
+            state.sandbox is not None
+            and self.config.sandbox.enabled
+            and state.sandbox.backend_name == "disabled"
+        ):
+            await self._emit(session, E.degraded(state.sandbox.disabled_reason()))
         await self._emit(session, E.progress("intent", "正在理解意图…"))
         await self._recognize_intent(state, user_content)
         await self._dispatch_skill(state, user_content)
@@ -393,6 +429,15 @@ class Agent:
         tasks = tasks[:max_par]
 
         delegated = self._delegated_policy()
+        subagent = self.config.subagent
+        if subagent is not None and not subagent.enabled:
+            return ToolResult(output="delegate 子代理已禁用", error=True)
+
+        # 子代理软预算：用 contextvar 精确统计本 delegate 组内的累计成本（不跨会话串扰）
+        budget_cap = subagent.budget_usd if subagent is not None else None
+        cost_token = begin_delegate_cost() if budget_cap is not None else None
+        sub_rounds = subagent.max_rounds if subagent is not None else 0
+        allowed_tools = self._subagent_tools(subagent)
 
         async def _one(idx: int, desc: str) -> str:
             if state.cancelled:
@@ -403,17 +448,62 @@ class Agent:
             scratch.append(Message(role="user", content="子任务：{}".format(desc)))
             tracker = ProcessTracker()
             await self._loop(
-                state, final=False, session=scratch, tracker=tracker, policy=delegated
+                state,
+                final=False,
+                session=scratch,
+                tracker=tracker,
+                policy=delegated,
+                max_rounds=sub_rounds,
+                tools=allowed_tools,
             )
             return "【{}】{}".format(title, self._summarize_scratch(scratch))
 
         await self._emit(session, E.progress("step", "并行执行 {} 个子任务…".format(len(tasks))))
         results = await asyncio.gather(*(_one(i, t) for i, t in enumerate(tasks)))
+
+        if cost_token is not None:
+            spent = end_delegate_cost(cost_token)
+            if spent > budget_cap:
+                status = {
+                    "delegate_budget_usd": budget_cap,
+                    "delegate_spent_usd": round(spent, 6),
+                }
+                await self._emit(session, E.budget_warning(status))
+                results.append(
+                    "⚠️ 本次 delegate 已超出子代理预算上限 ${:.4f} / ${:.4f}".format(
+                        spent, budget_cap
+                    )
+                )
         return ToolResult(output="\n\n".join(results))
 
     def _delegated_policy(self) -> PermissionPolicy:
-        """并行子 agent 用的委托策略：不弹审批，但保留命令 allow/deny 语义。"""
-        return PermissionPolicy(self.config.permissions, delegated=True)
+        """并行子 agent 用的委托策略：不弹审批 + 子代理收紧约束。"""
+        return PermissionPolicy(
+            self.config.permissions, delegated=True, subagent=self.config.subagent
+        )
+
+    def _subagent_tools(self, subagent: Any) -> Optional[List[str]]:
+        """计算子代理可用工具名列表；无额外限制时返回 None（沿用主代理 active_tools）。"""
+        if subagent is None or not subagent.enabled:
+            return None
+        if subagent.tools is None and subagent.allow_write and subagent.allow_execute:
+            return None
+        names = list(self.tools.names())
+        if subagent.tools is not None:
+            allowed = set(subagent.tools)
+            names = [n for n in names if n in allowed]
+        if not subagent.allow_write or not subagent.allow_execute:
+            out: List[str] = []
+            for n in names:
+                t = self.tools.get(n)
+                cat = getattr(t, "category", "")
+                if cat == "write" and not subagent.allow_write:
+                    continue
+                if cat == "execute" and not subagent.allow_execute:
+                    continue
+                out.append(n)
+            names = out
+        return names
 
     def _summarize_scratch(self, scratch: Session) -> str:
         texts = [m.content for m in scratch.messages if m.role == "assistant" and m.content]
@@ -441,6 +531,7 @@ class Agent:
         state.rejected = False
         state.cancel_token = ProcessTracker()
         state.active_tools = prev.get("active_tools")
+        _repair_interrupted(session)
         if state.backup is not None:
             state.backup.set_session(session.session_id)
             state.backup.begin_group()
@@ -475,19 +566,29 @@ class Agent:
         session: Optional[Session] = None,
         tracker: Optional[ProcessTracker] = None,
         policy: Optional[PermissionPolicy] = None,
+        max_rounds: Optional[int] = None,
+        tools: Optional[List[str]] = None,
     ) -> bool:
         """ReAct 内循环。返回是否有任何工具报错（供验证/重试使用）。"""
         session = session or state.session
-        max_rounds = 20
+        round_limit = max_rounds if (max_rounds and max_rounds > 0) else 20
         tracker = tracker or state.cancel_token
         pol = policy or state.policy
         errored = False
+
+        active_tools = state.active_tools
+        if tools is not None:
+            allowed = set(tools)
+            if active_tools is None:
+                active_tools = [n for n in self.tools.names() if n in allowed]
+            else:
+                active_tools = [n for n in active_tools if n in allowed]
 
         async def _done() -> None:
             if final:
                 await self._emit(session, E.done())
 
-        for round_idx in range(max_rounds):
+        for round_idx in range(round_limit):
             if state.cancelled:
                 break
             await self._check_budget(session)
@@ -500,28 +601,35 @@ class Agent:
             tool_calls: List[Dict[str, Any]] = []
             text_parts: List[str] = []
 
-            async for ev in resilient_stream(
-                [self._select_provider(state), *self._fallbacks],
-                messages,
-                self.tools.schemas(state.active_tools),
-                self.config.llm,
-                max_tokens=self.config.llm.per_request_max_tokens,
-                on_degraded=lambda msg: self._emit(session, E.degraded(msg)),
-            ):
-                if state.cancelled:
-                    await _done()
-                    return errored
-                if ev.kind == "text" and ev.delta:
-                    text_parts.append(ev.delta)
-                    await self._emit(session, E.assistant_text(redact(ev.delta)))
-                elif ev.kind == "tool_call" and ev.tool_name:
-                    tool_calls.append(
-                        {
-                            "id": ev.tool_id or "call_{}".format(uuid.uuid4().hex[:8]),
-                            "name": ev.tool_name,
-                            "arguments": ev.tool_arguments or "{}",
-                        }
-                    )
+            sem = self._llm_semaphore
+            if sem is not None:
+                await sem.acquire()
+            try:
+                async for ev in resilient_stream(
+                    [self._select_provider(state), *self._fallbacks],
+                    messages,
+                    self.tools.schemas(active_tools),
+                    self.config.llm,
+                    max_tokens=self.config.llm.per_request_max_tokens,
+                    on_degraded=lambda msg: self._emit(session, E.degraded(msg)),
+                ):
+                    if state.cancelled:
+                        await _done()
+                        return errored
+                    if ev.kind == "text" and ev.delta:
+                        text_parts.append(ev.delta)
+                        await self._emit(session, E.assistant_text(redact(ev.delta)))
+                    elif ev.kind == "tool_call" and ev.tool_name:
+                        tool_calls.append(
+                            {
+                                "id": ev.tool_id or "call_{}".format(uuid.uuid4().hex[:8]),
+                                "name": ev.tool_name,
+                                "arguments": ev.tool_arguments or "{}",
+                            }
+                        )
+            finally:
+                if sem is not None:
+                    sem.release()
 
             if not tool_calls:
                 # 纯文本回复，持久化到会话历史
@@ -616,6 +724,16 @@ class Agent:
         await self._emit(session, E.tool_call_start(tool_id, name, args))
 
         decision = "auto"
+
+        # 子代理工具级限制：收紧工具子集 / 禁止写 / 禁止执行
+        tool_obj = self.tools.get(name)
+        restrict_reason = pol.restrict_tool(name, getattr(tool_obj, "category", ""))
+        if restrict_reason:
+            result = ToolResult(output="工具被策略拒绝: {}".format(restrict_reason), error=True)
+            await self._finish_tool(session, tool_id, result)
+            if self._audit is not None:
+                self._audit.record("tool_call", tool=name, decision="deny", result_ok=False)
+            return True
 
         # 命令级强制拦截：黑名单/白名单命中，硬拒且不再弹审批
         if name == "run_shell":

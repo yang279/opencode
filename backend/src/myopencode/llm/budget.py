@@ -7,7 +7,7 @@
 """
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from ..config.schema import LLMConfig
 from .usage_store import UsageStore
@@ -25,9 +25,11 @@ class BudgetGuard:
         self.config = config
         self.store = store
 
-    def record(self, model: str, input_tokens: int, output_tokens: int, cost: float) -> None:
-        """usage 层回调：累计成本并落库（session_id 由 usage 层透传）。"""
-        self.store.record(model, None, input_tokens, output_tokens, cost)
+    def record(
+        self, session_id: Optional[str], model: str, input_tokens: int, output_tokens: int, cost: float
+    ) -> None:
+        """usage 层回调：累计成本并落库（session_id 用于按会话归因成本）。"""
+        self.store.record(model, session_id, input_tokens, output_tokens, cost)
 
     def status(self) -> Dict[str, Any]:
         day = self.store.total_day()

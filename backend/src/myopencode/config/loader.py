@@ -11,6 +11,7 @@ from .schema import (
     AppConfig,
     BackupConfig,
     ContainerSandboxConfig,
+    DEFAULT_PROTECT_PATHS,
     IntentConfig,
     LLMConfig,
     McpServerConfig,
@@ -21,6 +22,7 @@ from .schema import (
     ProviderConfig,
     SafetyConfig,
     SandboxConfig,
+    SubagentPolicyConfig,
     default_config,
 )
 
@@ -171,6 +173,7 @@ def _parse(data: Dict[str, Any]) -> AppConfig:
     cfg.backup = _parse_backup(data.get("backup"))
     cfg.observability = _parse_observability(data.get("observability"))
     cfg.planning = _parse_planning(data.get("planning"))
+    cfg.subagent = _parse_subagent(data.get("subagent"))
     cfg.llm = _parse_llm(data.get("llm"))
     cfg.safety = _parse_safety(data.get("safety"))
     return cfg
@@ -195,6 +198,7 @@ def _parse_permissions(raw: Any) -> PermissionsConfig:
         allow_commands=list(obj.get("allow_commands", [])),
         deny_commands=list(obj.get("deny_commands", [])),
         allow_all_commands=bool(obj.get("allow_all_commands", False)),
+        default_deny_commands=bool(obj.get("default_deny_commands", True)),
         require_approval_for_write=bool(obj.get("require_approval_for_write", True)),
         require_approval_for_shell=bool(obj.get("require_approval_for_shell", True)),
         max_output_bytes=int(obj.get("max_output_bytes", 262144)),
@@ -211,6 +215,8 @@ def _parse_mcp_servers(raw: Any) -> Dict[str, McpServerConfig]:
             args=list(obj.get("args", [])),
             env=_as_dict(obj.get("env")),
             url=obj.get("url"),
+            transport=str(obj.get("transport", "stdio")),
+            headers=_as_dict(obj.get("headers")),
         )
     return out
 
@@ -267,6 +273,8 @@ def _parse_sandbox(raw: Any) -> SandboxConfig:
         extra_read_paths=list(obj.get("extra_read_paths", [])),
         extra_write_paths=list(obj.get("extra_write_paths", [])),
         deny_write_outside_workspace=bool(obj.get("deny_write_outside_workspace", True)),
+        allow_pathguard_fallback=bool(obj.get("allow_pathguard_fallback", False)),
+        protect_paths=list(obj.get("protect_paths", DEFAULT_PROTECT_PATHS)),
     )
 
 
@@ -304,6 +312,22 @@ def _parse_planning(raw: Any) -> PlanningConfig:
     )
 
 
+def _parse_subagent(raw: Any) -> SubagentPolicyConfig:
+    obj = _as_dict(raw)
+    tools = obj.get("tools")
+    return SubagentPolicyConfig(
+        enabled=bool(obj.get("enabled", True)),
+        tools=list(tools) if tools is not None else None,
+        allow_commands=list(obj.get("allow_commands", [])),
+        deny_commands=list(obj.get("deny_commands", [])),
+        allow_write=bool(obj.get("allow_write", True)),
+        allow_execute=bool(obj.get("allow_execute", True)),
+        require_approval=bool(obj.get("require_approval", False)),
+        budget_usd=float(obj["budget_usd"]) if obj.get("budget_usd") is not None else None,
+        max_rounds=int(obj.get("max_rounds", 0)),
+    )
+
+
 def _parse_llm(raw: Any) -> LLMConfig:
     obj = _as_dict(raw)
     return LLMConfig(
@@ -313,6 +337,7 @@ def _parse_llm(raw: Any) -> LLMConfig:
         backoff_max=float(obj.get("backoff_max", 8.0)),
         fallback_providers=list(obj.get("fallback_providers", [])),
         pricing=_as_dict(obj.get("pricing")),
+        max_concurrent_calls=int(obj.get("max_concurrent_calls", 0)),
     )
 
 

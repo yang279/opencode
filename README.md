@@ -92,7 +92,10 @@ Skill 触发：除模型自觉调用 `load_skill` 外，还支持 frontmatter `m
 
 ## MCP 集成
 
-支持接入外部 MCP server（Model Context Protocol），其工具会自动注入 Agent，走统一审批（默认需确认）。当前支持 **stdio transport**（`command` + `args` + `env`）。
+支持接入外部 MCP server（Model Context Protocol），其工具会自动注入 Agent，走统一审批（默认需确认）。支持两种 transport：
+
+- **stdio**：`command` + `args` + `env` 拉起本地 server
+- **streamable HTTP**：`url` 单 endpoint，响应支持 JSON 与 SSE（可配 `headers` 鉴权）
 
 在 `myopencode.json` 里配置：
 
@@ -103,6 +106,11 @@ Skill 触发：除模型自觉调用 `load_skill` 外，还支持 frontmatter `m
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"],
       "env": {}
+    },
+    "remote": {
+      "url": "http://localhost:8080/mcp",
+      "transport": "http",
+      "headers": { "Authorization": "Bearer ..." }
     }
   }
 }
@@ -111,6 +119,15 @@ Skill 触发：除模型自觉调用 `load_skill` 外，还支持 frontmatter `m
 - 工具命名为 `mcp_<server>_<tool>`，在侧边栏「工具」tab 可见
 - MCP 工具默认触发审批弹窗（安全起见）
 - 本地测试可用内置 mock server：`examples/mcp_servers/mock_server.py`
+
+## 权限与命令策略
+
+- 写文件 / `run_shell` / `run_code` / MCP 工具默认走审批弹窗（读类与记忆工具免审批）。
+- `run_shell` 额外先做命令级校验（`security/policy.py::check_command`），按 shell 段首 token 的 basename 精确匹配，优先级：`deny_commands`（硬拒）> `allow_all_commands`（放行）> `allow_commands` 白名单 > `default_deny_commands`。
+- `permissions.default_deny_commands` 默认 `true`（企业态）：未列入白名单的命令一律硬拒；个人开发可设 `allow_all_commands: true` 或关闭该开关退回“放行 + 审批兜底”。
+- 写保护：`sandbox.protect_paths`（glob）命中即拒绝写，默认保护 `.git/**`、`myopencode.json`、`.env*`、`*.key`、`*.pem`、`~/.aws/**`、`~/.ssh/**`。
+- 沙箱 `sandbox.allow_pathguard_fallback=false`（默认）时，无 Docker/sandbox-exec 就禁用 `run_shell`/`run_code`（不静默降级直跑）。
+- 子代理：`subagent` 配置约束 `delegate`（工具子集 `tools`、命令白名单 `allow_commands`、`allow_write`/`allow_execute`、`budget_usd` 软上限、`max_rounds` 轮次）。
 
 ## 打包成桌面应用
 
@@ -177,7 +194,6 @@ Rust 主进程 panic 与前端未捕获异常（`error` / `unhandledrejection`�
 
 - [ ] RAG / 知识库 + 语义缓存
 - [ ] 自动更新（Tauri updater）
-- [ ] MCP 远程 transport（SSE / streamable HTTP）
 - [ ] `edit_file` diff 的可视化渲染增强
 - [ ] 依赖漏洞扫描 / SBOM、CI 接入 secret scan（gitleaks）
 - [ ] 代码签名 + 公证（需 Apple Developer 证书）

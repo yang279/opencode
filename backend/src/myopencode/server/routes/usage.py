@@ -59,6 +59,7 @@ async def usage_records(
     request: Request,
     limit: int = 500,
     model: Optional[str] = None,
+    session_id: Optional[str] = None,
 ):
     state = request.app.state
     store = getattr(state, "usage_store", None)
@@ -68,10 +69,31 @@ async def usage_records(
     for rec in reversed(_read_records(os.path.join(store.base, "records.jsonl"))):
         if model and rec.get("model") != model:
             continue
+        if session_id and rec.get("session_id") != session_id:
+            continue
         records.append(rec)
         if len(records) >= limit:
             break
     return {"records": records}
+
+
+@router.get("/usage/sessions")
+async def usage_by_session(request: Request):
+    """按会话聚合成本归因（tokens/cost/count）。"""
+    state = request.app.state
+    store = getattr(state, "usage_store", None)
+    if store is None:
+        return {"sessions": []}
+    agg: dict = {}
+    for rec in _read_records(os.path.join(store.base, "records.jsonl")):
+        sid = rec.get("session_id") or "(未归属)"
+        a = agg.setdefault(sid, {"session_id": sid, "tokens_in": 0, "tokens_out": 0, "cost": 0.0, "count": 0})
+        a["tokens_in"] = int(a["tokens_in"]) + int(rec.get("input_tokens", 0))
+        a["tokens_out"] = int(a["tokens_out"]) + int(rec.get("output_tokens", 0))
+        a["cost"] = float(a["cost"]) + float(rec.get("cost", 0.0))
+        a["count"] += 1
+    sessions = sorted(agg.values(), key=lambda x: x["cost"], reverse=True)
+    return {"sessions": sessions}
 
 
 @router.get("/usage/export")

@@ -84,7 +84,12 @@ def decrypt(data: bytes) -> bytes:
         return data
     nonce = data[len(MAGIC) : len(MAGIC) + 12]
     ct = data[len(MAGIC) + 12 :]
-    return AESGCM(_master_key()).decrypt(nonce, ct, MAGIC)
+    try:
+        return AESGCM(_master_key()).decrypt(nonce, ct, MAGIC)
+    except Exception as exc:
+        # 密钥丢失/变更、密文损坏 → 统一抛 ValueError，让上层「读取失败即视为空」的
+        # except ValueError 分支生效（AESGCM 原抛 InvalidTag，不属于 ValueError）。
+        raise ValueError("解密失败: {}".format(exc)) from exc
 
 
 def encrypt_str(s: str) -> str:

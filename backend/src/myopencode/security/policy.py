@@ -5,7 +5,7 @@ import os
 import shlex
 from typing import Any, Dict, Iterator, List, Optional
 
-from ..config.schema import PermissionsConfig
+from ..config.schema import PermissionsConfig, SubagentPolicyConfig
 
 # 审批决策常量
 APPROVE_ONCE = "once"
@@ -14,10 +14,17 @@ REJECT = "reject"
 
 
 class PermissionPolicy:
-    def __init__(self, config: PermissionsConfig, delegated: bool = False) -> None:
+    def __init__(
+        self,
+        config: PermissionsConfig,
+        delegated: bool = False,
+        subagent: Optional[SubagentPolicyConfig] = None,
+    ) -> None:
         self.config = config
         # delegated=True 用于并行子 agent：不弹审批（在父步骤已授权范围内自主执行）
         self.delegated = delegated
+        # 子代理策略（可选）：工具/命令/预算的收紧约束
+        self.subagent = subagent
         # 已「always allow」的工具，后续跳过审批
         self._always_allow_tools: set = set()
 
@@ -27,7 +34,9 @@ class PermissionPolicy:
     def needs_approval(self, tool: str, args: Dict[str, Any]) -> Optional[str]:
         """返回需要审批的原因；不需要则返回 None。"""
         if self.delegated:
-            return None
+            # 子代理：默认免审批；仅当 subagent.require_approval=True 时才走审批
+            if self.subagent is None or not self.subagent.require_approval:
+                return None
         if tool in self._always_allow_tools:
             return None
         if tool in (
@@ -63,29 +72,54 @@ class PermissionPolicy:
         """分级命令校验：返回拒绝原因（None=放行，之后仍走审批开关）。
 
         优先级：
-        1. deny_commands 命中任一命令段首 token → 硬拒（绝不执行，也不再弹审批）
+        1. deny_commands（含子代理额外 deny）命中任一命令段首 token → 硬拒
         2. allow_all_commands → 放行
-        3. 配置了 allow_commands → 每段首 token 都需命中白名单（其余拒绝）
-        4. 都未配置 → 默认放行（deny-only 模式，由审批开关兜底）
+        3. 配置了 allow_commands（子代理有则覆盖主配置）→ 每段首 token 都需命中白名单
+        4. 都未配置 → default_deny_commands 时默认拒绝（企业态），否则默认放行（deny-only）
 
         匹配用「段首 token 的 basename 精确相等」，而非整串 startswith，
         从而 `echo rm` 放行、`rm -rf /` 硬拒，堵住前缀绕过。
         """
+        deny = list(self.config.deny_commands)
+        allow = self.config.allow_commands
+        allow_all = self.config.allow_all_commands
+        if self.subagent is not None:
+            deny = list(dict.fromkeys([*deny, *self.subagent.deny_commands]))
+            if self.subagent.allow_commands:
+                allow = self.subagent.allow_commands
+                allow_all = False
+
         leads = list(_iter_command_leads(command or ""))
         if not leads:
             return None
         for name in leads:
-            for deny in self.config.deny_commands:
-                if not deny:
+            for d in deny:
+                if not d:
                     continue
-                if name == deny:
-                    return "命令命中禁用名单: {}".format(deny)
-        if self.config.allow_all_commands:
+                if name == d:
+                    return "命令命中禁用名单: {}".format(d)
+        if allow_all:
             return None
-        if self.config.allow_commands:
+        if allow:
             for name in leads:
-                if name not in self.config.allow_commands:
+                if name not in allow:
                     return "命令不在允许名单内: {}".format(name)
+            return None
+        if self.config.default_deny_commands:
+            return "命令不在允许名单内（默认拒绝）: {}".format(leads[0])
+        return None
+
+    def restrict_tool(self, name: str, category: str = "") -> Optional[str]:
+        """子代理工具级限制：返回拒绝原因（None=允许）。"""
+        if self.subagent is None:
+            return None
+        sp = self.subagent
+        if sp.tools is not None and name not in sp.tools:
+            return "子代理不允许使用工具: {}".format(name)
+        if category == "write" and not sp.allow_write:
+            return "子代理不允许写文件"
+        if category == "execute" and not sp.allow_execute:
+            return "子代理不允许执行命令/代码"
         return None
 
 

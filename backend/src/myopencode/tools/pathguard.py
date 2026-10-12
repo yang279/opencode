@@ -6,6 +6,7 @@
 """
 from __future__ import annotations
 
+import fnmatch
 import os
 from typing import Iterable, List, Optional
 
@@ -36,6 +37,23 @@ def _within(target: str, roots: Iterable[str]) -> bool:
     return False
 
 
+def _protect_deny(real: str, patterns: List[str], working_dir: str) -> Optional[str]:
+    """命中任一写保护 glob 模式则返回该模式，否则 None。"""
+    for pat in patterns:
+        if not pat:
+            continue
+        p = pat
+        if p.startswith("~"):
+            p = os.path.expanduser(p)
+        if os.path.isabs(p):
+            full = os.path.normcase(os.path.normpath(p))
+        else:
+            full = os.path.normcase(os.path.normpath(os.path.join(working_dir, p)))
+        if fnmatch.fnmatch(real, full):
+            return pat
+    return None
+
+
 class PathGuard:
     """根据工作目录与额外允许路径，判定某个读写路径是否合法。"""
 
@@ -45,11 +63,13 @@ class PathGuard:
         extra_read_paths: Optional[List[str]] = None,
         extra_write_paths: Optional[List[str]] = None,
         deny_write_outside_workspace: bool = True,
+        protect_paths: Optional[List[str]] = None,
     ) -> None:
         self.working_dir = _realpath(working_dir)
         self._read_roots = [_realpath(p) for p in (extra_read_paths or [])]
         self._write_roots = [_realpath(p) for p in (extra_write_paths or [])]
         self.deny_write_outside_workspace = deny_write_outside_workspace
+        self.protect_paths = list(protect_paths or [])
 
     def resolve(self, path: str, write: bool = False) -> str:
         """归一化并校验路径，返回真实路径；越界抛 PathDeniedError。"""
@@ -60,6 +80,9 @@ class PathGuard:
                 real, [self.working_dir, *self._write_roots]
             ):
                 raise PathDeniedError(path, "写操作超出工作目录")
+            hit = _protect_deny(real, self.protect_paths, self.working_dir)
+            if hit:
+                raise PathDeniedError(path, "命中保护路径: {}".format(hit))
         else:
             if not _within(real, [self.working_dir, *self._read_roots]):
                 raise PathDeniedError(path, "读操作超出工作目录")

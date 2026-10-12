@@ -9,22 +9,31 @@ import asyncio
 import os
 import sys
 import tempfile
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from ..core import metrics
 from ..core import tracing
 from .base import ToolContext, ToolResult, read_bounded
 
 
-def _wasm_runner_binary() -> str:
+def _wasm_runner_binary() -> Optional[str]:
+    """解析 wasm-runner 可执行文件路径；不存在则返回 None。
+
+    优先级：环境变量 `MYOPENCODE_WASM_RUNNER` → sidecar 同目录的 `wasm-runner[.exe]`。
+    """
     env = os.environ.get("MYOPENCODE_WASM_RUNNER")
     if env:
-        return env
+        return env if os.path.exists(env) else None
     exe = getattr(sys, "executable", "")
     if exe and os.path.isabs(exe):
         name = "wasm-runner.exe" if os.name == "nt" else "wasm-runner"
-        return os.path.join(os.path.dirname(exe), name)
-    return "wasm-runner"
+        path = os.path.join(os.path.dirname(exe), name)
+        return path if os.path.exists(path) else None
+    return None
+
+
+def _wasm_available() -> bool:
+    return _wasm_runner_binary() is not None
 
 
 async def _run_argv(argv: List[str], cwd: str, timeout: int, ctx: ToolContext) -> ToolResult:
@@ -69,20 +78,29 @@ class RunCodeTool:
     name = "run_code"
     category = "execute"
     description = "在隔离沙箱中执行代码片段（python 或 wasm）"
-    json_schema = {
-        "type": "object",
-        "properties": {
-            "language": {"type": "string", "enum": ["python", "wasm"]},
-            "code": {"type": "string", "description": "代码内容"},
-            "timeout": {"type": "integer", "default": 30},
-        },
-        "required": ["language", "code"],
-    }
+
+    @property
+    def json_schema(self) -> Dict[str, Any]:
+        languages = ["python"]
+        if _wasm_available():
+            languages.append("wasm")
+        return {
+            "type": "object",
+            "properties": {
+                "language": {"type": "string", "enum": languages},
+                "code": {"type": "string", "description": "代码内容"},
+                "timeout": {"type": "integer", "default": 30},
+            },
+            "required": ["language", "code"],
+        }
 
     async def execute(self, args: Dict[str, Any], ctx: ToolContext) -> ToolResult:
         language = str(args.get("language", "python")).lower()
         code = str(args.get("code", ""))
         timeout = int(args.get("timeout", 30))
+
+        if ctx.sandbox is not None and ctx.sandbox.disabled:
+            return ToolResult(output=ctx.sandbox.disabled_reason(), error=True)
 
         if language == "wasm":
             return await self._run_wasm(code, timeout, ctx)
@@ -108,6 +126,9 @@ class RunCodeTool:
 
     async def _run_wasm(self, code: str, timeout: int, ctx: ToolContext) -> ToolResult:
         # code 应是编译好的 .wasm 文件路径（相对工作目录）
+        runner = _wasm_runner_binary()
+        if runner is None:
+            return ToolResult(output="wasm-runner 未安装/未打包（language=wasm 不可用）", error=True)
         if ctx.path_guard is not None:
             wasm_path = ctx.path_guard.resolve(code, write=False)
         else:
@@ -115,7 +136,7 @@ class RunCodeTool:
         if not os.path.isfile(wasm_path):
             return ToolResult(output="找不到 wasm 模块: {}".format(code), error=True)
         argv = [
-            _wasm_runner_binary(),
+            runner,
             "run-wasm",
             "--dir",
             ctx.working_dir,

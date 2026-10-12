@@ -38,6 +38,17 @@ def test_decrypt_str_passthrough(monkeypatch):
     assert crypto.decrypt_str(plain_b64) == plain_b64
 
 
+def test_decrypt_wrong_key_raises_valueerror(monkeypatch):
+    _seed(monkeypatch)
+    ct = crypto.encrypt(b"secret")
+    # 换一把钥匙再解 → 应抛 ValueError（而非 cryptography 的 InvalidTag）
+    _seed(monkeypatch)
+    import pytest
+
+    with pytest.raises(ValueError):
+        crypto.decrypt(ct)
+
+
 def test_session_manager_encrypted_roundtrip(tmp_path, monkeypatch):
     _seed(monkeypatch)
     from myopencode.core.session_manager import SessionManager

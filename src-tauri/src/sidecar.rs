@@ -120,35 +120,44 @@ fn apply_python_env(cmd: &mut Command) {
 }
 
 /// 从子进程 stdout 读取握手行，返回解析后的 BackendInfo。
+///
+/// 只返回能解析为 BackendInfo JSON 的行，杂散非 JSON 输出（如第三方库向 stdout
+/// 的意外打印）会被忽略并转写到宿主 stderr，避免污染握手协议。
 fn read_handshake(child: &mut Child) -> Result<BackendInfo, String> {
     let stdout = child
         .stdout
         .take()
         .ok_or_else(|| "后端进程无 stdout".to_string())?;
     let mut reader = BufReader::new(stdout);
-    let mut line = String::new();
 
     let deadline = std::time::Instant::now() + Duration::from_secs(30);
+    let mut line = String::new();
     loop {
-        if !line.is_empty() {
-            break;
-        }
         if std::time::Instant::now() > deadline {
             let _ = child.kill();
             return Err("等待后端握手超时".to_string());
         }
+        line.clear();
         match reader.read_line(&mut line) {
             Ok(0) => {
                 let _ = child.wait();
                 return Err("后端进程提前退出".to_string());
             }
-            Ok(_) => line = line.trim().to_string(),
+            Ok(_) => {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    continue;
+                }
+                match serde_json::from_str::<BackendInfo>(trimmed) {
+                    Ok(info) => return Ok(info),
+                    Err(_) => {
+                        eprintln!("[sidecar] 忽略非握手 stdout 行: {trimmed}");
+                    }
+                }
+            }
             Err(e) => return Err(format!("读取握手失败: {e}")),
         }
     }
-
-    serde_json::from_str::<BackendInfo>(&line)
-        .map_err(|e| format!("握手行解析失败: {e}"))
 }
 
 /// 终止整个 sidecar 进程组（PyInstaller onefile 是「引导器 + Python 子进程」，

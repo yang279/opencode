@@ -1,8 +1,10 @@
+import os
 import tempfile
 
 from myopencode.config.schema import LLMConfig
 from myopencode.llm.budget import BudgetGuard
 from myopencode.llm.usage_store import UsageStore
+from myopencode.server.routes.usage import _read_records
 
 
 def _guard(**kw):
@@ -44,3 +46,11 @@ def test_budget_hard_stop_flag():
     assert st["over"] is True
     assert st["hard_stop"] is True
     assert "$" in guard.message(st)
+
+
+def test_budget_record_attaches_session():
+    guard, store = _guard()
+    guard.record("sess-42", "gpt-4o", 100, 50, 0.5)
+    recs = _read_records(os.path.join(store.base, "records.jsonl"))
+    assert len(recs) == 1
+    assert recs[0]["session_id"] == "sess-42"

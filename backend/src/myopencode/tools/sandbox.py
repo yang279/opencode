@@ -205,6 +205,33 @@ class NativeBackend:
         pass
 
 
+class DisabledBackend:
+    """无可用隔离后端且不允许 pathguard 降级：execute 工具一律拒绝。"""
+
+    name = "disabled"
+
+    def __init__(self, working_dir: str, config: SandboxConfig) -> None:
+        self.working_dir = _real(working_dir)
+        self.config = config
+        self.__name__ = self.name
+
+    @staticmethod
+    def message() -> str:
+        return "沙箱不可用：未检测到 Docker/sandbox-exec，且已禁止降级到 pathguard（allow_pathguard_fallback=false）"
+
+    def wrap_shell(self, command: str) -> List[str]:
+        raise RuntimeError(DisabledBackend.message())
+
+    def wrap_argv(self, argv: List[str]) -> List[str]:
+        raise RuntimeError(DisabledBackend.message())
+
+    def wrap_python(self, code_file: str) -> List[str]:
+        raise RuntimeError(DisabledBackend.message())
+
+    def kill_last(self) -> None:
+        pass
+
+
 # ── 门面 ────────────────────────────────────────────────────────
 class Sandbox:
     """沙箱门面：持有 PathGuard + 选型后的后端。"""
@@ -217,6 +244,7 @@ class Sandbox:
             extra_read_paths=config.extra_read_paths,
             extra_write_paths=config.extra_write_paths,
             deny_write_outside_workspace=config.deny_write_outside_workspace,
+            protect_paths=config.protect_paths,
         )
         self._backend = self._select(config)
 
@@ -227,6 +255,13 @@ class Sandbox:
     @property
     def backend_name(self) -> str:
         return getattr(self._backend, "name", "pathguard")
+
+    @property
+    def disabled(self) -> bool:
+        return self.backend_name == "disabled"
+
+    def disabled_reason(self) -> str:
+        return DisabledBackend.message()
 
     def _select(self, config: SandboxConfig):
         if not config.enabled or config.backend == "none":
@@ -240,15 +275,20 @@ class Sandbox:
                 return SeatbeltBackend(self.working_dir, config)
             if want == "pathguard":
                 return NativeBackend(self.working_dir, config)
-            # 指定但不可用 → 降级 pathguard
-            return NativeBackend(self.working_dir, config)
+            # 指定但不可用 → 按 allow_pathguard_fallback 决定降级或禁用
+            return self._fallback(config)
 
-        # auto：container → seatbelt → pathguard
+        # auto：container → seatbelt → pathguard/disabled
         if ContainerBackend.available():
             return ContainerBackend(self.working_dir, config)
         if SeatbeltBackend.available():
             return SeatbeltBackend(self.working_dir, config)
-        return NativeBackend(self.working_dir, config)
+        return self._fallback(config)
+
+    def _fallback(self, config: SandboxConfig):
+        if config.allow_pathguard_fallback:
+            return NativeBackend(self.working_dir, config)
+        return DisabledBackend(self.working_dir, config)
 
     def wrap_shell(self, command: str) -> List[str]:
         return self._backend.wrap_shell(command)

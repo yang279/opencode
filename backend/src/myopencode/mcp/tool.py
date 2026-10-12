@@ -4,7 +4,6 @@ from __future__ import annotations
 from typing import Any, Dict
 
 from ..tools.base import ToolContext, ToolResult
-from .client import MCPClient
 
 
 def _extract_text(result: Dict[str, Any]) -> str:
@@ -24,7 +23,7 @@ def _extract_text(result: Dict[str, Any]) -> str:
 
 
 class McpTool:
-    def __init__(self, server: str, client: MCPClient, spec: Dict[str, Any]) -> None:
+    def __init__(self, server: str, client: Any, spec: Dict[str, Any]) -> None:
         self.server = server
         self.client = client
         self.category = "mcp"

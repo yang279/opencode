@@ -7,6 +7,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+# 默认写保护路径：命中即拒绝写（相对工作目录的 glob 模式）
+DEFAULT_PROTECT_PATHS = [
+    ".git/**",
+    "myopencode.json",
+    "**/.env*",
+    "**/*.key",
+    "**/*.pem",
+    "~/.aws/**",
+    "~/.ssh/**",
+]
+
 
 @dataclass
 class ProviderConfig:
@@ -25,6 +36,8 @@ class PermissionsConfig:
     allow_commands: List[str] = field(default_factory=list)
     deny_commands: List[str] = field(default_factory=list)
     allow_all_commands: bool = False
+    # 企业态：未配置白名单时命令默认拒绝（False=保持旧版默认放行，deny-only）
+    default_deny_commands: bool = True
     require_approval_for_write: bool = True
     require_approval_for_shell: bool = True
     # 工具输出进入 LLM/前端前的字节上限（超出截断）
@@ -35,12 +48,15 @@ class PermissionsConfig:
 
 @dataclass
 class McpServerConfig:
-    """单个 MCP server 的连接配置（stdio 或远程 url）。"""
+    """单个 MCP server 的连接配置（stdio 或远程 streamable HTTP）。"""
 
     command: Optional[str] = None
     args: List[str] = field(default_factory=list)
     env: Dict[str, str] = field(default_factory=dict)
     url: Optional[str] = None
+    # transport: stdio | http（streamable HTTP，含 SSE 响应解析）
+    transport: str = "stdio"
+    headers: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -131,6 +147,8 @@ class LLMConfig:
     monthly_budget_usd: Optional[float] = None
     # 单次请求最大生成 token 数（None 表示不限制，沿用 provider 默认）
     per_request_max_tokens: Optional[int] = None
+    # 跨会话的 LLM 并发上限（0=不限；>0 时全局信号量限制并发调用）
+    max_concurrent_calls: int = 0
     # 预算超限时是否硬停当前任务（True=硬停，False=仅告警）
     budget_hard_stop: bool = True
     # 模型路由：简单意图走更便宜的小模型（复用主 provider 连接，只换模型名）
@@ -151,6 +169,28 @@ class PlanningConfig:
     verify_command: Optional[str] = None  # 可选：每步后执行的验证命令
     # 命中这些意图类别时跳过规划（直接 ReAct），省一次规划 LLM 往返
     skip_intents: List[str] = field(default_factory=lambda: ["question", "chat"])
+
+
+@dataclass
+class SubagentPolicyConfig:
+    """delegate 子代理策略：并行子任务的工具/命令/预算约束。"""
+
+    enabled: bool = True
+    # 子代理可用工具子集（None=继承主代理；列表=仅这些工具名）
+    tools: Optional[List[str]] = None
+    # 子代理专用命令白名单（非空时覆盖主配置 allow_commands）
+    allow_commands: List[str] = field(default_factory=list)
+    # 额外禁止命令（与主配置 deny_commands 取并集）
+    deny_commands: List[str] = field(default_factory=list)
+    # 是否允许写文件 / 执行命令·代码
+    allow_write: bool = True
+    allow_execute: bool = True
+    # 子代理是否重新弹审批（默认 False=免审批，沿用委托语义）
+    require_approval: bool = False
+    # 单次 delegate 总成本软上限（美元）；None=不限
+    budget_usd: Optional[float] = None
+    # 单个子任务最多 ReAct 轮次（0=沿用默认 20）
+    max_rounds: int = 0
 
 
 @dataclass
@@ -178,6 +218,10 @@ class SandboxConfig:
     extra_read_paths: List[str] = field(default_factory=list)
     extra_write_paths: List[str] = field(default_factory=list)
     deny_write_outside_workspace: bool = True
+    # 无可用容器/seatbelt 时是否允许降级到 pathguard（False=禁用 execute 工具）
+    allow_pathguard_fallback: bool = False
+    # 写保护路径（glob 模式，相对工作目录；命中则拒绝写）
+    protect_paths: List[str] = field(default_factory=lambda: list(DEFAULT_PROTECT_PATHS))
 
 
 @dataclass
@@ -218,6 +262,7 @@ class AppConfig:
     backup: BackupConfig = field(default_factory=BackupConfig)
     observability: ObservabilityConfig = field(default_factory=ObservabilityConfig)
     planning: PlanningConfig = field(default_factory=PlanningConfig)
+    subagent: SubagentPolicyConfig = field(default_factory=SubagentPolicyConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     safety: SafetyConfig = field(default_factory=SafetyConfig)
     reflexion: ReflexionConfig = field(default_factory=ReflexionConfig)
