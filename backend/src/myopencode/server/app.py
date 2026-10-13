@@ -8,7 +8,7 @@ from typing import Callable, Optional
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
-from ..config.schema import AppConfig
+from ..config.schema import AppConfig, ProviderConfig
 from ..core.agent import Agent
 from ..core.audit import AuditLogger
 from ..core.backup import BackupManager
@@ -20,7 +20,13 @@ from ..core.telemetry import TelemetryExporter
 from ..intent.pipeline import build_intent_pipeline
 from ..llm import usage
 from ..llm.budget import BudgetGuard
-from ..llm.registry import create_provider, create_recognition_provider, create_summary_provider
+from ..llm.registry import (
+    create_lite_provider,
+    create_named_provider,
+    create_provider,
+    create_recognition_provider,
+    create_summary_provider,
+)
 from ..llm.usage_store import UsageStore
 from ..mcp.registry import McpRegistry
 from ..memory.manager import MemoryManager
@@ -33,12 +39,15 @@ from ..memory.tools import (
     RecallMemoryTool,
     SaveMemoryTool,
 )
+from ..rag.embedder import Embedder
+from ..rag.reranker import Reranker
 from ..rag.service import RagService
 from ..security.content_filter import ContentFilter
 from ..security.policy import PermissionPolicy
 from ..security.safety import SafetyGate
 from ..skills.load_skill_tool import LoadSkillTool
 from ..skills.registry import SkillRegistry, scan_skills
+from ..tools.rag_search import RagSearchTool
 from ..tools.registry import ToolRegistry
 from ..tools.sandbox import Sandbox
 from .routes import crash, diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace, rag
@@ -55,6 +64,24 @@ def create_app(
     provider = create_provider(config)
     usage.configure(config.llm.pricing)
     skill_registry = SkillRegistry(scan_skills(config.working_dir))
+
+    # RAG：embedding（复用 provider 连接）+ LLM 重排 + 服务
+    emb_name = config.rag.embedding_provider or config.resolve_provider()
+    emb_pc = config.providers.get(emb_name, ProviderConfig())
+    embedder = Embedder(
+        model=config.rag.embedding_model,
+        api_key=emb_pc.api_key,
+        base_url=emb_pc.base_url,
+    )
+    if config.rag.rerank_model:
+        rerank_pc = config.providers.get(config.resolve_provider(), ProviderConfig())
+        rerank_provider = create_named_provider(
+            config.resolve_provider(), rerank_pc, config.rag.rerank_model
+        )
+    else:
+        rerank_provider = create_lite_provider(config) or provider
+    reranker = Reranker(rerank_provider)
+    rag_service = RagService(config.rag, embedder=embedder, reranker=reranker)
 
     memory_store = MemoryStore()
     memory_store.load()
@@ -73,7 +100,7 @@ def create_app(
     metrics_mod.set_default(metrics)
     audit = AuditLogger(config.observability.audit_file, config.observability.audit_enabled)
 
-    extra_tools = [LoadSkillTool(skill_registry)]
+    extra_tools = [LoadSkillTool(skill_registry), RagSearchTool(rag_service)]
     if config.memory.enabled:
         extra_tools.extend(
             [
@@ -94,7 +121,6 @@ def create_app(
     usage.set_budget_sink(budget.record)
     reflexion = ReflexionController(config.reflexion, provider, budget=budget, metrics=metrics)
     mcp_registry = McpRegistry(config.mcp_servers, sandbox=sandbox)
-    rag_service = RagService(config.rag)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -162,6 +188,7 @@ def create_app(
         content_filter=content_filter,
         budget=budget,
         reflexion=reflexion,
+        rag=rag_service,
     )
     manager.bind_agent(agent)
     manager.bind_sessions(session_manager)

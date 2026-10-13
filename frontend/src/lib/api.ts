@@ -213,6 +213,13 @@ export interface RagUploadResult {
   error?: string;
 }
 
+export interface RagQueryResult {
+  text: string;
+  heading: string;
+  source: string;
+  score: number;
+}
+
 export const api = {
   health: () => request<HealthInfo>("/health"),
   getConfig: () => request<AppConfig>("/config"),
@@ -263,6 +270,11 @@ export const api = {
   ragDocs: () => request<{ docs: RagDoc[] }>("/rag/docs"),
   ragDelete: (id: string) =>
     request<{ ok: boolean }>(`/rag/docs/${id}`, { method: "DELETE" }),
+  ragQuery: (q: string, top_k = 5) =>
+    request<{ query: string; results: RagQueryResult[] }>(
+      `/rag/query?q=${encodeURIComponent(q)}&top_k=${top_k}`,
+    ),
+  ragReindex: () => request<{ chunks: number; vectors: number }>("/rag/reindex", { method: "POST" }),
   reportCrash: (payload: { message: string; stack?: string; source?: string }) =>
     request<{ ok: boolean }>("/crash", {
       method: "POST",

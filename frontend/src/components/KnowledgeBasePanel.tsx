@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, List, Tag, Typography, Spin, Empty, message, Popconfirm } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
-import { api, type RagDoc } from "../lib/api";
+import { Button, Input, List, Tag, Typography, Spin, Empty, message, Popconfirm, Divider } from "antd";
+import { UploadOutlined, SearchOutlined, ReloadOutlined } from "@ant-design/icons";
+import { api, type RagDoc, type RagQueryResult } from "../lib/api";
 
 export default function KnowledgeBasePanel() {
   const [docs, setDocs] = useState<RagDoc[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [query, setQuery] = useState("");
+  const [searching, setSearching] = useState(false);
+  const [results, setResults] = useState<RagQueryResult[]>([]);
+  const [reindexing, setReindexing] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = () => {
@@ -48,6 +52,33 @@ export default function KnowledgeBasePanel() {
     }
   };
 
+  const onSearch = async () => {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    try {
+      const r = await api.ragQuery(q);
+      setResults(r.results);
+    } catch {
+      message.error("检索失败");
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const onReindex = async () => {
+    setReindexing(true);
+    try {
+      const r = await api.ragReindex();
+      message.success(`重建完成：${r.chunks} 块 / ${r.vectors} 向量`);
+      refresh();
+    } catch {
+      message.error("重建索引失败");
+    } finally {
+      setReindexing(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ marginBottom: 12, display: "flex", gap: 8 }}>
@@ -67,10 +98,46 @@ export default function KnowledgeBasePanel() {
         >
           上传文档
         </Button>
-        <Typography.Text style={{ fontSize: 11, color: "#8a857b", alignSelf: "center" }}>
-          支持 PDF / Word / Markdown / 文本 / 代码
-        </Typography.Text>
+        <Button size="small" icon={<ReloadOutlined />} loading={reindexing} onClick={onReindex}>
+          重建索引
+        </Button>
       </div>
+
+      <Divider style={{ margin: "8px 0" }} />
+
+      <Input.Search
+        size="small"
+        placeholder="检索测试（如：如何安装）"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        onSearch={onSearch}
+        enterButton={<SearchOutlined />}
+        loading={searching}
+        allowClear
+      />
+
+      {results.length > 0 && (
+        <List
+          size="small"
+          style={{ marginTop: 8 }}
+          dataSource={results}
+          renderItem={(r, i) => (
+            <List.Item style={{ padding: "8px 4px", display: "block" }}>
+              <Typography.Text style={{ fontSize: 11, color: "#8a857b" }}>
+                [{i + 1}] 来源: {r.source} · {r.heading}（{r.score}）
+              </Typography.Text>
+              <Typography.Paragraph
+                style={{ fontSize: 12, margin: "4px 0 0", whiteSpace: "pre-wrap" }}
+                ellipsis={{ rows: 3, expandable: true, symbol: "展开" }}
+              >
+                {r.text}
+              </Typography.Paragraph>
+            </List.Item>
+          )}
+        />
+      )}
+
+      <Divider style={{ margin: "12px 0 8px" }} />
 
       {loading ? (
         <Spin style={{ padding: 16 }} />

@@ -92,21 +92,47 @@ class RagStore:
         return row["source_path"]
 
     # ── chunks ────────────────────────────────────────────────────
-    def add_chunks(self, doc_id: str, chunks: List[Any]) -> None:
-        """chunks: list of Chunk（.text/.heading/.token_count）。embedding 后补。"""
+    def add_chunks(self, doc_id: str, chunks: List[Any]) -> List[Dict[str, Any]]:
+        """chunks: list of Chunk（.text/.heading/.token_count）。返回插入的 [{id, text}]。"""
+        inserted: List[Dict[str, Any]] = []
         for i, c in enumerate(chunks):
+            cid = uuid.uuid4().hex
             self._conn.execute(
                 "INSERT OR REPLACE INTO chunks (id, doc_id, seq, text, heading, token_count, embedding)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (uuid.uuid4().hex, doc_id, i, c.text, c.heading, c.token_count, None),
+                (cid, doc_id, i, c.text, c.heading, c.token_count, None),
             )
+            inserted.append({"id": cid, "text": c.text})
         self._conn.commit()
+        return inserted
 
     def count_chunks(self, doc_id: str) -> int:
         row = self._conn.execute(
             "SELECT COUNT(*) AS n FROM chunks WHERE doc_id = ?", (doc_id,)
         ).fetchone()
         return row["n"] if row else 0
+
+    def load_all_chunks(self) -> List[Dict[str, Any]]:
+        """返回全库 chunk（含来源文档名与 embedding 原始 BLOB），供检索重建索引。"""
+        rows = self._conn.execute(
+            "SELECT c.id, c.doc_id, c.seq, c.text, c.heading, c.token_count, c.embedding,"
+            " d.name AS source"
+            " FROM chunks c LEFT JOIN docs d ON d.id = c.doc_id"
+            " ORDER BY d.created_at DESC, c.seq ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def chunks_without_embedding(self) -> List[Dict[str, Any]]:
+        rows = self._conn.execute(
+            "SELECT id, text FROM chunks WHERE embedding IS NULL ORDER BY seq ASC"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def update_embedding(self, chunk_id: str, blob: bytes) -> None:
+        self._conn.execute(
+            "UPDATE chunks SET embedding = ? WHERE id = ?", (blob, chunk_id)
+        )
+        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()

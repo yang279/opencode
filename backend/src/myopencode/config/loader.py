@@ -376,4 +376,11 @@ def _parse_rag(raw: Any) -> RagConfig:
         contextualize_model=obj.get("contextualize_model"),
         top_k=int(obj.get("top_k", 5)),
         intents_to_trigger=list(obj.get("intents_to_trigger", ["question", "chat"])),
+        bm25_enabled=bool(obj.get("bm25_enabled", True)),
+        rrf_k=float(obj.get("rrf_k", 60.0)),
+        per_path_recall=int(obj.get("per_path_recall", 20)),
+        fusion_candidates=int(obj.get("fusion_candidates", 20)),
+        rerank_model=obj.get("rerank_model"),
+        max_per_doc=int(obj.get("max_per_doc", 2)),
+        injection_max_tokens=int(obj.get("injection_max_tokens", 2000)),
     )

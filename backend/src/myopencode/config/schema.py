@@ -278,13 +278,22 @@ class RagConfig:
     # 清洗：PDF/Word 专项（去页眉页脚/页码、断行合并、连字符）与 chunk 去重
     clean_pdf: bool = True
     dedup: bool = True
-    # 向量化与检索（后续 Phase 接入）
+    # 向量化与检索
     embedding_model: str = "text-embedding-3-large"
     embedding_provider: Optional[str] = None
     contextualize: bool = False
     contextualize_model: Optional[str] = None
     top_k: int = 5
     intents_to_trigger: List[str] = field(default_factory=lambda: ["question", "chat"])
+    # 多路召回 + 融合 + 重排
+    bm25_enabled: bool = True
+    rrf_k: float = 60.0
+    per_path_recall: int = 20
+    fusion_candidates: int = 20
+    rerank_model: Optional[str] = None
+    # 注入过滤
+    max_per_doc: int = 2
+    injection_max_tokens: int = 2000
 
 
 @dataclass

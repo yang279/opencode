@@ -1,12 +1,15 @@
 """RAG 摄取管线单测：extract / clean / chunker / store / service。"""
 from __future__ import annotations
 
+import asyncio
 import io
 
 from myopencode.config.schema import RagConfig
+from myopencode.rag.bm25 import BM25Index, tokenize
 from myopencode.rag.chunker import Chunk, chunk_text, dedup_chunks, kind_for_ext
 from myopencode.rag.clean import clean_text
 from myopencode.rag.extract import extract_text, file_ext
+from myopencode.rag.reranker import _parse_order
 from myopencode.rag.service import RagService
 from myopencode.rag.store import RagStore
 
@@ -159,10 +162,51 @@ def test_store_dedup_and_delete(tmp_path):
 def test_service_upload_dedup(tmp_path):
     cfg = RagConfig(docs_dir=str(tmp_path / "docs"), index_file=str(tmp_path / "index.sqlite3"))
     svc = RagService(cfg)
-    r1 = svc.upload("a.txt", "这是一段测试内容。".encode())
+    r1 = asyncio.run(svc.upload("a.txt", "这是一段测试内容。".encode()))
     assert r1["skipped"] is False and r1["chunks"] >= 1 and r1["doc_id"]
-    r2 = svc.upload("a.txt", "这是一段测试内容。".encode())
+    r2 = asyncio.run(svc.upload("a.txt", "这是一段测试内容。".encode()))
     assert r2["skipped"] is True and r2["doc_id"] == r1["doc_id"]
     assert len(svc.list_documents()) == 1
     assert svc.delete(r1["doc_id"]) is True
     assert svc.list_documents() == []
+
+
+# ── Phase 2：BM25 / rerank / 检索 ───────────────────────────────────
+def test_bm25_tokenize_and_search():
+    assert tokenize("Hello 世界 world") == ["hello", "世", "界", "world"]
+    idx = BM25Index()
+    idx.build(["苹果是一种水果", "篮球是一项运动", "苹果手机很好用"])
+    hits = [i for i, _ in idx.search("苹果")]
+    assert 0 in hits and 2 in hits
+
+
+def test_reranker_parse_order():
+    assert _parse_order("[2, 0, 1]", 3) == [2, 0, 1]
+    assert _parse_order("garbage", 3) == [0, 1, 2]
+    assert _parse_order("[0]", 3) == [0, 1, 2]
+
+
+class _FakeEmbedder:
+    available = True
+
+    async def embed(self, texts):
+        return [[1.0, 0.0, 0.0, 0.0] for _ in texts]
+
+
+class _FakeReranker:
+    async def rerank(self, query, chunks):
+        return list(range(len(chunks)))
+
+
+def test_service_search_bm25(tmp_path):
+    cfg = RagConfig(docs_dir=str(tmp_path / "docs"), index_file=str(tmp_path / "index.sqlite3"))
+    svc = RagService(cfg, embedder=_FakeEmbedder(), reranker=_FakeReranker())
+    asyncio.run(svc.upload("a.txt", "苹果是一种水果。\n\n天空是蓝色的。".encode()))
+    results = asyncio.run(svc.search("苹果"))
+    assert any("苹果" in r["text"] for r in results)
+
+
+def test_service_search_empty(tmp_path):
+    cfg = RagConfig(docs_dir=str(tmp_path / "docs"), index_file=str(tmp_path / "index.sqlite3"))
+    svc = RagService(cfg)
+    assert asyncio.run(svc.search("什么都不存在的查询")) == []

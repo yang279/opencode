@@ -101,6 +101,7 @@ class RunState:
     intent_section: str = ""
     last_intent_category: Optional[str] = None
     skill_content: str = ""
+    rag_section: str = ""
 
 
 class Agent:
@@ -123,6 +124,7 @@ class Agent:
         budget: Any = None,
         skills: Any = None,
         reflexion: Any = None,
+        rag: Any = None,
     ) -> None:
         self.config = config
         self.provider = provider
@@ -138,6 +140,7 @@ class Agent:
         self._safety = safety
         self._content_filter = content_filter
         self._budget = budget
+        self._rag = rag
         self._budget_warned = False
         self._fallbacks = create_fallback_providers(config)
         self._lite_provider = create_lite_provider(config)
@@ -177,6 +180,9 @@ class Agent:
 
     def set_reflexion(self, reflexion: Any) -> None:
         self._reflexion = reflexion
+
+    def set_rag(self, rag: Any) -> None:
+        self._rag = rag
 
     def _select_provider(self, state: RunState) -> Any:
         """按当前意图类别选择主模型或小模型。"""
@@ -317,6 +323,7 @@ class Agent:
         await self._emit(session, E.progress("intent", "正在理解意图…"))
         await self._recognize_intent(state, user_content)
         await self._dispatch_skill(state, user_content)
+        await self._maybe_inject_rag(state, user_content)
         self._budget_warned = False
         try:
             try:
@@ -935,6 +942,9 @@ class Agent:
         if state.skill_content:
             prompt = (prompt + "\n\n## Skill 指令\n" + state.skill_content) if prompt else state.skill_content
 
+        if state.rag_section:
+            prompt = (prompt + "\n\n" + state.rag_section) if prompt else state.rag_section
+
         prompt = (prompt + "\n" + _ASK_USER_GUIDANCE) if prompt else _ASK_USER_GUIDANCE
 
         out: List[Message] = []
@@ -972,6 +982,25 @@ class Agent:
         await self._emit(
             state.session, E.progress("skill", "已匹配 skill：{}".format(skill.name))
         )
+
+    async def _maybe_inject_rag(self, state: RunState, user_content: str) -> None:
+        """意图为触发类别时，检索知识库并注入 system 段。"""
+        if self._rag is None or not self.config.rag.enabled:
+            return
+        if state.last_intent_category not in self.config.rag.intents_to_trigger:
+            return
+        try:
+            results = await self._rag.search(user_content)
+        except Exception:
+            return
+        if not results:
+            return
+        lines = ["## 知识库检索结果"]
+        for i, r in enumerate(results, 1):
+            head = r.get("heading") or r.get("source") or ""
+            lines.append("[{}] 来源: {} · 标题: {}".format(i, r.get("source", ""), head))
+            lines.append(r.get("text", ""))
+        state.rag_section = "\n".join(lines)
 
     def _intent_system_section(self, plan: Any) -> str:
         labels = {
