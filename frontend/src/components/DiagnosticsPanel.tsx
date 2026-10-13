@@ -59,7 +59,7 @@ export default function DiagnosticsPanel() {
         </Space>
       </Space>
 
-      <Typography.Text style={{ fontSize: 12, color: "#6e6a63" }}>模型</Typography.Text>
+      <Typography.Text style={{ fontSize: 12, color: "#5f6170" }}>模型</Typography.Text>
       <div style={{ fontSize: 12, marginBottom: 4 }}>
         {data.provider.name}
         {data.provider.model ? ` · ${data.provider.model}` : ""}{" "}
@@ -68,7 +68,7 @@ export default function DiagnosticsPanel() {
         </Tag>
       </div>
 
-      <Typography.Text style={{ fontSize: 12, color: "#6e6a63" }}>沙箱</Typography.Text>
+      <Typography.Text style={{ fontSize: 12, color: "#5f6170" }}>沙箱</Typography.Text>
       <div style={{ fontSize: 12, marginBottom: 4 }}>
         {data.sandbox.enabled ? data.sandbox.backend : "已禁用"}{" "}
         <Tag color={data.sandbox.backend === "pathguard" ? "warning" : "default"}>
@@ -76,7 +76,7 @@ export default function DiagnosticsPanel() {
         </Tag>
       </div>
 
-      <Typography.Text style={{ fontSize: 12, color: "#6e6a63" }}>功能开关</Typography.Text>
+      <Typography.Text style={{ fontSize: 12, color: "#5f6170" }}>功能开关</Typography.Text>
       <div style={{ marginBottom: 4 }}>
         {Object.entries(data.features).map(([k, v]) => (
           <span key={k} style={{ marginRight: 4, fontSize: 11 }}>
@@ -85,7 +85,7 @@ export default function DiagnosticsPanel() {
         ))}
       </div>
 
-      <Typography.Text style={{ fontSize: 12, color: "#6e6a63" }}>内存 / 磁盘</Typography.Text>
+      <Typography.Text style={{ fontSize: 12, color: "#5f6170" }}>内存 / 磁盘</Typography.Text>
       <div style={{ fontSize: 12, marginBottom: 4 }}>
         峰值 RSS {fmtBytes(data.process.maxrss_bytes)} · 日志 {fmtBytes(data.disk.logs)} · 审计{" "}
         {fmtBytes(data.disk.audit)}
@@ -93,7 +93,7 @@ export default function DiagnosticsPanel() {
 
       {spans.length > 0 && (
         <>
-          <Typography.Text style={{ fontSize: 12, color: "#6e6a63" }}>最近 Span</Typography.Text>
+          <Typography.Text style={{ fontSize: 12, color: "#5f6170" }}>最近 Span</Typography.Text>
           <Table<TraceSpan>
             size="small"
             rowKey="span_id"

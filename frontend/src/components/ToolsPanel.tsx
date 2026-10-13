@@ -21,7 +21,7 @@ export default function ToolsPanel() {
       <Empty
         image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={
-          <span style={{ fontSize: 12, color: "#8a857b" }}>
+          <span style={{ fontSize: 12, color: "#8b8da0" }}>
             暂无 MCP 工具
             <br />
             在 myopencode.json 里配置 mcp_servers
@@ -39,13 +39,13 @@ export default function ToolsPanel() {
         <List.Item style={{ padding: "10px 4px" }}>
           <div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <CodeOutlined style={{ color: "#8a857b" }} />
+              <CodeOutlined style={{ color: "#8b8da0" }} />
               <Typography.Text strong style={{ fontSize: 13 }}>
                 {t.name}
               </Typography.Text>
             </div>
             <Typography.Text
-              style={{ fontSize: 12, color: "#8a857b", display: "block", marginTop: 2 }}
+              style={{ fontSize: 12, color: "#8b8da0", display: "block", marginTop: 2 }}
             >
               {t.description}
             </Typography.Text>

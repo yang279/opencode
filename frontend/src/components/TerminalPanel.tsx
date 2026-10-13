@@ -4,10 +4,10 @@ import { CloseOutlined } from "@ant-design/icons";
 import type { TerminalLine } from "../hooks/useAgent";
 
 const COLORS: Record<TerminalLine["kind"], string> = {
-  cmd: "#b8562f",
-  out: "#1f1e1d",
-  err: "#c62828",
-  info: "#2e7d32",
+  cmd: "#5b5bd6",
+  out: "#1c1d26",
+  err: "#dc2626",
+  info: "#16a34a",
 };
 
 export default function TerminalPanel({
@@ -24,21 +24,21 @@ export default function TerminalPanel({
   }, [lines]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#f5f3ec" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "#eff0f6" }}>
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           padding: "6px 8px 6px 14px",
-          borderBottom: "1px solid #e8e6dc",
+          borderBottom: "1px solid #e4e5ee",
         }}
       >
-        <Typography.Text style={{ fontSize: 12, color: "#8a857b" }}>
+        <Typography.Text style={{ fontSize: 12, color: "#8b8da0" }}>
           终端 / 工具输出
         </Typography.Text>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-          <Typography.Text style={{ fontSize: 11, color: "#b0aca1" }}>F12 收起</Typography.Text>
+          <Typography.Text style={{ fontSize: 11, color: "#b9bac9" }}>F12 收起</Typography.Text>
           <Button size="small" type="text" icon={<CloseOutlined />} onClick={onClose} />
         </span>
       </div>

@@ -130,7 +130,7 @@ export default function KnowledgeBasePanel() {
           dataSource={results}
           renderItem={(r, i) => (
             <List.Item style={{ padding: "8px 4px", display: "block" }}>
-              <Typography.Text style={{ fontSize: 11, color: "#8a857b" }}>
+              <Typography.Text style={{ fontSize: 11, color: "#8b8da0" }}>
                 [{i + 1}] 来源: {r.source} · {r.heading}（{r.score}）
               </Typography.Text>
               <Typography.Paragraph
@@ -152,7 +152,7 @@ export default function KnowledgeBasePanel() {
         <Empty
           style={{ marginTop: 24 }}
           image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={<span style={{ fontSize: 12, color: "#8a857b" }}>知识库为空，上传文档开始构建</span>}
+          description={<span style={{ fontSize: 12, color: "#8b8da0" }}>知识库为空，上传文档开始构建</span>}
         />
       ) : (
         <List

@@ -14,6 +14,7 @@ import {
   PaperClipOutlined,
 } from "@ant-design/icons";
 import type { Attachment, ChatMessage, ThinkingEntry } from "../types/events";
+import logo from "../assets/icon.png";
 
 function Diff({ diff }: { diff: string }) {
   if (!diff) return null;
@@ -54,12 +55,12 @@ function summarizeArgs(name: string, args?: Record<string, unknown>): string {
 function ToolRow({ m }: { m: Extract<ChatMessage, { role: "tool" }> }) {
   const status =
     m.status === "running"
-      ? { icon: <span className="thinking-entry-dot running" style={{ display: "inline-block", marginTop: 0 }} />, color: "#b8562f" }
+      ? { icon: <span className="thinking-entry-dot running" style={{ display: "inline-block", marginTop: 0 }} />, color: "#5b5bd6" }
       : m.status === "done"
-        ? { icon: <CheckOutlined />, color: "#8a857b" }
+        ? { icon: <CheckOutlined />, color: "#8b8da0" }
         : m.status === "error"
-          ? { icon: <CloseOutlined />, color: "#c62828" }
-          : { icon: <CloseOutlined />, color: "#d97757" };
+          ? { icon: <CloseOutlined />, color: "#dc2626" }
+          : { icon: <CloseOutlined />, color: "#5b5bd6" };
   const summary = summarizeArgs(m.name, m.args);
   return (
     <div style={{ marginBottom: 4, opacity: m.status === "done" ? 0.85 : 1 }}>
@@ -77,7 +78,7 @@ function ToolRow({ m }: { m: Extract<ChatMessage, { role: "tool" }> }) {
                   style={{
                     fontFamily: "SF Mono, Menlo, Consolas, monospace",
                     fontSize: 12,
-                    color: "#6e6a63",
+                    color: "#5f6170",
                     fontWeight: 500,
                     flexShrink: 0,
                   }}
@@ -93,7 +94,7 @@ function ToolRow({ m }: { m: Extract<ChatMessage, { role: "tool" }> }) {
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
                       fontSize: 12,
-                      color: "#9a958c",
+                      color: "#8b8da0",
                     }}
                   >
                     {summary}
@@ -113,10 +114,10 @@ function ToolRow({ m }: { m: Extract<ChatMessage, { role: "tool" }> }) {
                     style={{
                       margin: 0,
                       fontSize: 12,
-                      color: "#6e6a63",
+                      color: "#5f6170",
                       whiteSpace: "pre-wrap",
-                      background: "#faf9f5",
-                      border: "1px solid #eeece3",
+                      background: "#f7f7fb",
+                      border: "1px solid #e4e5ee",
                       borderRadius: 8,
                       padding: "8px 10px",
                     }}
@@ -130,7 +131,7 @@ function ToolRow({ m }: { m: Extract<ChatMessage, { role: "tool" }> }) {
                       whiteSpace: "pre-wrap",
                       fontSize: 12,
                       margin: 0,
-                      color: "#1f1e1d",
+                      color: "#1c1d26",
                     }}
                   >
                     {m.result}
@@ -160,16 +161,16 @@ function ApprovalCard({
   return (
     <div
       style={{
-        background: "#faf6ef",
-        border: "1px solid #ebd9c4",
-        borderLeft: "3px solid #d97757",
+        background: "#f6f6fc",
+        border: "1px solid #dfe0f2",
+        borderLeft: "3px solid #5b5bd6",
         borderRadius: 12,
         padding: "12px 14px",
         marginBottom: 14,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <WarningOutlined style={{ color: "#d97757" }} />
+        <WarningOutlined style={{ color: "#5b5bd6" }} />
         <Typography.Text strong style={{ fontSize: 13 }}>
           {m.tool}
         </Typography.Text>
@@ -188,10 +189,10 @@ function ApprovalCard({
         style={{
           margin: "10px 0 0",
           fontSize: 12,
-          color: "#1f1e1d",
+          color: "#1c1d26",
           whiteSpace: "pre-wrap",
           background: "#ffffff",
-          border: "1px solid #eeece3",
+          border: "1px solid #e4e5ee",
           borderRadius: 8,
           padding: "8px 10px",
         }}
@@ -263,18 +264,18 @@ function AskUserCard({
   return (
     <div
       style={{
-        background: "#faf6ef",
-        border: "1px solid #ebd9c4",
-        borderLeft: "3px solid #d97757",
+        background: "#f6f6fc",
+        border: "1px solid #dfe0f2",
+        borderLeft: "3px solid #5b5bd6",
         borderRadius: 12,
         padding: "12px 14px",
         marginBottom: 14,
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <QuestionCircleOutlined style={{ color: "#d97757", marginTop: 2, flexShrink: 0 }} />
+        <QuestionCircleOutlined style={{ color: "#5b5bd6", marginTop: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, color: "#3f3c37", whiteSpace: "pre-wrap" }}>{m.question}</div>
+          <div style={{ fontSize: 13, color: "#1c1d26", whiteSpace: "pre-wrap" }}>{m.question}</div>
           {pending && options.length > 0 && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
               {options.map((o) => {
@@ -291,15 +292,15 @@ function AskUserCard({
                       padding: "8px 10px",
                       borderRadius: 8,
                       cursor: "pointer",
-                      border: `1px solid ${active || isRec ? "#d97757" : "#eeece3"}`,
-                      background: active ? "#fdf1ec" : "#ffffff",
+                      border: `1px solid ${active || isRec ? "#5b5bd6" : "#e4e5ee"}`,
+                      background: active ? "#eef0fe" : "#ffffff",
                       transition: "border-color .15s",
                     }}
                   >
                     {multi && (
                       <span
                         style={{
-                          color: active ? "#d97757" : "#b5b0a6",
+                          color: active ? "#5b5bd6" : "#b9bac9",
                           flexShrink: 0,
                           fontSize: 12,
                         }}
@@ -312,19 +313,19 @@ function AskUserCard({
                         style={{
                           fontSize: 13,
                           fontWeight: isRec ? 600 : 400,
-                          color: "#1f1e1d",
+                          color: "#1c1d26",
                         }}
                       >
                         {o.label}
                       </div>
                       {o.description && (
-                        <div style={{ fontSize: 12, color: "#8a857b", marginTop: 2 }}>
+                        <div style={{ fontSize: 12, color: "#8b8da0", marginTop: 2 }}>
                           {o.description}
                         </div>
                       )}
                     </div>
                     {isRec && (
-                      <Tag color="volcano" style={{ margin: 0, flexShrink: 0 }}>
+                      <Tag color="purple" style={{ margin: 0, flexShrink: 0 }}>
                         推荐
                       </Tag>
                     )}
@@ -354,7 +355,7 @@ function AskUserCard({
             </div>
           ) : (
             m.answer !== undefined && (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#8a857b", whiteSpace: "pre-wrap" }}>
+              <div style={{ marginTop: 8, fontSize: 12, color: "#8b8da0", whiteSpace: "pre-wrap" }}>
                 你：{formatAnswer(m.answer)}
               </div>
             )
@@ -376,18 +377,18 @@ function SafetyCard({
   return (
     <div
       style={{
-        background: "#fdf6f0",
-        border: "1px solid #f0d3b0",
-        borderLeft: "3px solid #e6a23c",
+        background: "#fdf7f1",
+        border: "1px solid #f2e2cd",
+        borderLeft: "3px solid #d97706",
         borderRadius: 12,
         padding: "12px 14px",
         marginBottom: 14,
       }}
     >
       <div style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
-        <WarningOutlined style={{ color: "#e6a23c", marginTop: 2, flexShrink: 0 }} />
+        <WarningOutlined style={{ color: "#d97706", marginTop: 2, flexShrink: 0 }} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#7a4a1d" }}>检测到安全风险</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#7c4a12" }}>检测到安全风险</div>
           <ul style={{ margin: "8px 0 0", paddingLeft: 18, fontSize: 12, color: "#8a6a3f" }}>
             {m.reasons.map((r, i) => (
               <li key={i}>{r}</li>
@@ -440,7 +441,7 @@ function AttachmentList({ attachments }: { attachments?: Attachment[] }) {
               {
                 key: `${i}`,
                 label: (
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#6e6a63", fontSize: 12 }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#5f6170", fontSize: 12 }}>
                     <PaperClipOutlined style={{ fontSize: 12 }} />
                     {a.name}
                   </span>
@@ -452,10 +453,10 @@ function AttachmentList({ attachments }: { attachments?: Attachment[] }) {
                         style={{
                           margin: 0,
                           fontSize: 12,
-                          color: "#1f1e1d",
+                          color: "#1c1d26",
                           whiteSpace: "pre-wrap",
-                          background: "#faf9f5",
-                          border: "1px solid #eeece3",
+                          background: "#f7f7fb",
+                          border: "1px solid #e4e5ee",
                           borderRadius: 8,
                           padding: "8px 10px",
                           maxHeight: 320,
@@ -477,13 +478,13 @@ function AttachmentList({ attachments }: { attachments?: Attachment[] }) {
                   }
                   if (isPdf) {
                     return (
-                      <span style={{ fontSize: 12, color: "#8a857b" }}>
+                      <span style={{ fontSize: 12, color: "#8b8da0" }}>
                         PDF 附件（已发送给模型，此处不预览）
                       </span>
                     );
                   }
                   return (
-                    <span style={{ fontSize: 12, color: "#8a857b" }}>
+                    <span style={{ fontSize: 12, color: "#8b8da0" }}>
                       {a.media_type} 附件
                     </span>
                   );
@@ -509,7 +510,7 @@ function ContentFlag({ m }: { m: Extract<ChatMessage, { role: "content_flag" }> 
         marginBottom: 12,
       }}
     >
-      <WarningOutlined style={{ color: "#e6a23c" }} />
+      <WarningOutlined style={{ color: "#d97706" }} />
       <span>{m.message}</span>
     </div>
   );
@@ -518,7 +519,7 @@ function ContentFlag({ m }: { m: Extract<ChatMessage, { role: "content_flag" }> 
 function ThinkingRow({ entries, active }: { entries: ThinkingEntry[]; active: boolean }) {
   if (entries.length === 0 && active) {
     return (
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, color: "#b5b0a6", fontSize: 12 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, color: "#b9bac9", fontSize: 12 }}>
         <span className="thinking-mini-dots">
           <i />
           <i />
@@ -544,7 +545,7 @@ function ThinkingRow({ entries, active }: { entries: ThinkingEntry[]; active: bo
           {
             key: "thinking",
             label: (
-              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#8a857b", fontSize: 12 }}>
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#8b8da0", fontSize: 12 }}>
                 <BulbOutlined style={{ fontSize: 12 }} />
                 {active && (
                   <span className="thinking-mini-dots">
@@ -557,7 +558,7 @@ function ThinkingRow({ entries, active }: { entries: ThinkingEntry[]; active: bo
               </span>
             ),
             children: timelineEntries.length === 0 ? (
-              <span style={{ fontSize: 12, color: "#9a958c" }}>暂无更多细节</span>
+              <span style={{ fontSize: 12, color: "#8b8da0" }}>暂无更多细节</span>
             ) : (
               <div
                 style={{
@@ -566,18 +567,18 @@ function ThinkingRow({ entries, active }: { entries: ThinkingEntry[]; active: bo
                   gap: 8,
                   paddingTop: 2,
                   paddingLeft: 12,
-                  borderLeft: "2px solid #eeece3",
+                  borderLeft: "2px solid #e4e5ee",
                 }}
               >
                 {timelineEntries.map((e) => (
                   <div key={e.id} style={{ display: "flex", alignItems: "flex-start", gap: 8 }}>
                     <span className={`thinking-entry-dot ${e.status ?? ""}`} />
                     <div style={{ minWidth: 0 }}>
-                      <span style={{ fontSize: 13, fontWeight: 450, color: "#6e6a63" }}>
+                      <span style={{ fontSize: 13, fontWeight: 450, color: "#5f6170" }}>
                         {e.title}
                       </span>
                       {e.detail && (
-                        <div style={{ fontSize: 12, color: "#9a958c", marginTop: 2 }}>{e.detail}</div>
+                        <div style={{ fontSize: 12, color: "#8b8da0", marginTop: 2 }}>{e.detail}</div>
                       )}
                     </div>
                   </div>
@@ -609,13 +610,11 @@ export default function MessageList({
   if (messages.length === 0) {
     return (
       <div style={{ padding: "48px 8px", textAlign: "center" }}>
-        <div className="claude-logo" style={{ margin: "0 auto 20px", width: 44, height: 44, borderRadius: 14, fontSize: 30, lineHeight: "44px" }}>
-          *
-        </div>
-        <div className="serif" style={{ fontSize: 26, color: "#1f1e1d", fontWeight: 600 }}>
+        <img src={logo} className="app-logo-img app-logo-img-lg" alt="myopencode" style={{ margin: "0 auto 20px" }} />
+        <div style={{ fontSize: 26, color: "#1c1d26", fontWeight: 600 }}>
           有什么可以帮你？
         </div>
-        <div style={{ marginTop: 10, fontSize: 14, color: "#8a857b" }}>
+        <div style={{ marginTop: 10, fontSize: 14, color: "#8b8da0" }}>
           让 Agent 读写文件、搜索代码、执行命令，帮你完成编程任务
         </div>
       </div>
@@ -665,11 +664,11 @@ export default function MessageList({
             width: 30,
             height: 30,
             borderRadius: "50%",
-            background: isUser ? "#e8e6dc" : "#d97757",
+            background: isUser ? "#e4e5ee" : "linear-gradient(135deg, #6d6ae0, #4f46e5)",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: isUser ? "#6e6a63" : "#fff",
+            color: isUser ? "#5f6170" : "#fff",
           }}
         >
           {isUser ? <UserOutlined /> : <RobotOutlined />}
@@ -677,14 +676,14 @@ export default function MessageList({
         <div style={{ flex: 1, minWidth: 0, paddingTop: 3 }}>
           <div
             className={isUser ? undefined : "markdown-body"}
-            style={{ color: "#1f1e1d", whiteSpace: isUser ? "pre-wrap" : undefined }}
+            style={{ color: "#1c1d26", whiteSpace: isUser ? "pre-wrap" : undefined }}
           >
             {isUser ? (
               <Typography.Text style={{ fontSize: 15 }}>{m.content}</Typography.Text>
             ) : (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.content}</ReactMarkdown>
             )}
-            {m.streaming && <LoadingOutlined style={{ marginLeft: 6, color: "#b8562f" }} />}
+            {m.streaming && <LoadingOutlined style={{ marginLeft: 6, color: "#5b5bd6" }} />}
           </div>
           <AttachmentList attachments={m.attachments} />
         </div>

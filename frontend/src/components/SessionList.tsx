@@ -29,7 +29,7 @@ export default function SessionList({
         {sessions.length === 0 ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
-            description={<span style={{ fontSize: 12, color: "#8a857b" }}>暂无会话</span>}
+            description={<span style={{ fontSize: 12, color: "#8b8da0" }}>暂无会话</span>}
           />
         ) : (
           sessions.map((s) => {
@@ -46,11 +46,11 @@ export default function SessionList({
                   borderRadius: 8,
                   cursor: "pointer",
                   marginBottom: 2,
-                  background: active ? "#e8e4da" : "transparent",
-                  color: active ? "#1f1e1d" : "#4a463f",
+                  background: active ? "#eef0fe" : "transparent",
+                  color: active ? "#1c1d26" : "#5f6170",
                 }}
               >
-                <MessageOutlined style={{ fontSize: 12, color: active ? "#d97757" : "#8a857b", flexShrink: 0 }} />
+                <MessageOutlined style={{ fontSize: 12, color: active ? "#5b5bd6" : "#8b8da0", flexShrink: 0 }} />
                 <span
                   style={{
                     flex: 1,
@@ -68,7 +68,7 @@ export default function SessionList({
                     e.stopPropagation();
                     onDelete(s.id);
                   }}
-                  style={{ fontSize: 12, color: "#b5b0a6", flexShrink: 0 }}
+                  style={{ fontSize: 12, color: "#b9bac9", flexShrink: 0 }}
                 />
               </div>
             );

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { Modal, Form, Input, Select, Switch, InputNumber, Divider, Typography, message } from "antd";
+import { Modal, Form, Input, Select, Switch, InputNumber, Divider, Typography, message, Slider, Upload, Button } from "antd";
+import { UploadOutlined, DeleteOutlined } from "@ant-design/icons";
 import { api, type AppConfig } from "../lib/api";
+import { useBackground } from "../hooks/useBackground";
 
 const SANDBOX_BACKENDS = [
   { label: "自动", value: "auto" },
@@ -26,6 +28,7 @@ const DEFAULT_MODELS: Record<string, string> = {
 
 export default function ConfigModal({ open, onClose, onSaved }: Props) {
   const [form] = Form.useForm();
+  const bg = useBackground();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [baseConfig, setBaseConfig] = useState<AppConfig | null>(null);
@@ -218,6 +221,59 @@ export default function ConfigModal({ open, onClose, onSaved }: Props) {
           </Form.Item>
         </div>
       </Form>
+
+      <Divider style={{ margin: "16px 0 8px" }} />
+      <Typography.Text strong style={{ fontSize: 13, display: "block", marginBottom: 8 }}>
+        外观
+      </Typography.Text>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+        <Upload
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          showUploadList={false}
+          beforeUpload={async (file) => {
+            try {
+              await bg.upload(file);
+              message.success("背景图已更新");
+            } catch (e) {
+              message.error(String(e));
+            }
+            return false;
+          }}
+        >
+          <Button icon={<UploadOutlined />}>上传背景图</Button>
+        </Upload>
+        {bg.dataUrl && (
+          <img
+            src={bg.dataUrl}
+            alt="背景预览"
+            style={{ width: 64, height: 40, borderRadius: 6, objectFit: "cover", border: "1px solid #e4e5ee" }}
+          />
+        )}
+        {bg.dataUrl && (
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            onClick={async () => {
+              try {
+                await bg.remove();
+                message.success("已移除背景图");
+              } catch (e) {
+                message.error(String(e));
+              }
+            }}
+          >
+            移除
+          </Button>
+        )}
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <Typography.Text style={{ fontSize: 13 }}>模糊度</Typography.Text>
+        <Slider min={0} max={40} value={bg.blur} onChange={bg.setBlur} />
+      </div>
+      <div>
+        <Typography.Text style={{ fontSize: 13 }}>暗化度</Typography.Text>
+        <Slider min={0} max={80} value={bg.dark} onChange={bg.setDark} />
+      </div>
     </Modal>
   );
 }

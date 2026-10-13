@@ -275,6 +275,16 @@ export const api = {
       `/rag/query?q=${encodeURIComponent(q)}&top_k=${top_k}`,
     ),
   ragReindex: () => request<{ chunks: number; vectors: number }>("/rag/reindex", { method: "POST" }),
+  getBackground: () => request<{ exists: boolean; data_url: string | null }>("/ui/background"),
+  uploadBackground: async (file: File) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request<{ ok: boolean; error?: string }>("/ui/background", {
+      method: "PUT",
+      body: fd,
+    });
+  },
+  deleteBackground: () => request<{ ok: boolean }>("/ui/background", { method: "DELETE" }),
   reportCrash: (payload: { message: string; stack?: string; source?: string }) =>
     request<{ ok: boolean }>("/crash", {
       method: "POST",

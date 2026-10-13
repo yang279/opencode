@@ -1,5 +1,28 @@
 :root {
   color-scheme: light;
+
+  --primary: #5b5bd6;
+  --primary-hover: #4f46e5;
+  --primary-deep: #4f46e5;
+  --primary-soft: #eef0fe;
+
+  --bg: #f7f7fb;
+  --bg-sidebar: #eff0f6;
+  --bg-code: #f1f1f8;
+
+  --surface: #ffffff;
+  --surface-subtle: #fafafc;
+
+  --border: #e4e5ee;
+  --border-strong: #d2d3e0;
+
+  --text: #1c1d26;
+  --text-secondary: #5f6170;
+  --text-muted: #8b8da0;
+
+  --success: #16a34a;
+  --danger: #dc2626;
+  --warning: #d97706;
 }
 
 html,
@@ -7,7 +30,7 @@ body,
 #root {
   margin: 0;
   height: 100%;
-  background: #faf9f5;
+  background: var(--bg);
 }
 
 * {
@@ -20,12 +43,12 @@ body,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #d8d4ca;
+  background: var(--border-strong);
   border-radius: 8px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #bfbaae;
+  background: #b9bac9;
 }
 
 ::-webkit-scrollbar-track {
@@ -34,31 +57,28 @@ body,
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d8d4ca transparent;
+  scrollbar-color: var(--border-strong) transparent;
 }
 
-.serif {
-  font-family: Georgia, "Times New Roman", "Songti SC", "Noto Serif SC", serif;
-}
-
-.claude-logo {
-  width: 22px;
-  height: 22px;
-  border-radius: 7px;
-  background: #d97757;
-  color: #fff;
-  font-family: Georgia, "Songti SC", serif;
-  font-weight: 600;
-  font-size: 15px;
-  line-height: 22px;
-  text-align: center;
+.app-logo-img {
+  display: block;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  object-fit: cover;
   flex-shrink: 0;
+}
+
+.app-logo-img-lg {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
 }
 
 .markdown-body {
   font-size: 15px;
   line-height: 1.7;
-  color: #1f1e1d;
+  color: var(--text);
 }
 
 .markdown-body > :first-child {
@@ -70,8 +90,8 @@ body,
 }
 
 .markdown-body pre {
-  background: #f0eee6;
-  border: 1px solid #e8e6dc;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   overflow: auto;
@@ -80,24 +100,24 @@ body,
 .markdown-body code {
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.88em;
-  background: #f0eee6;
+  background: var(--bg-code);
   padding: 2px 5px;
   border-radius: 6px;
-  color: #b8562f;
+  color: var(--primary-deep);
 }
 
 .markdown-body pre code {
   background: transparent;
   padding: 0;
-  color: #1f1e1d;
+  color: var(--text);
 }
 
 .diff-view {
   font-family: "SF Mono", Menlo, Consolas, monospace;
   font-size: 12px;
   white-space: pre-wrap;
-  background: #f0eee6;
-  border: 1px solid #e8e6dc;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   max-height: 240px;
@@ -111,17 +131,17 @@ body,
 }
 
 .diff-add {
-  color: #2e7d32;
-  background: #e6f4ea;
+  color: #15803d;
+  background: #e7f6ec;
 }
 
 .diff-del {
   color: #c62828;
-  background: #fdecea;
+  background: #fdeceb;
 }
 
 .diff-hunk {
-  color: #b3562f;
+  color: var(--primary-deep);
 }
 
 .thinking-dots {
@@ -129,8 +149,8 @@ body,
   align-items: center;
   gap: 4px;
   padding: 10px 14px;
-  background: #f5f3ec;
-  border: 1px solid #e8e6dc;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
   border-radius: 12px;
 }
 
@@ -138,7 +158,7 @@ body,
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #d97757;
+  background: var(--primary);
   animation: thinking-bounce 1.2s infinite ease-in-out;
 }
 
@@ -160,7 +180,7 @@ body,
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #d97757;
+  background: var(--primary);
   animation: thinking-bounce 1.2s infinite ease-in-out;
 }
 
@@ -178,20 +198,20 @@ body,
   height: 8px;
   border-radius: 50%;
   margin-top: 4px;
-  background: #d8d4ca;
+  background: var(--border-strong);
 }
 
 .thinking-entry-dot.running {
-  background: #d97757;
+  background: var(--primary);
   animation: thinking-pulse 1.2s infinite ease-in-out;
 }
 
 .thinking-entry-dot.done {
-  background: #2e7d32;
+  background: var(--success);
 }
 
 .thinking-entry-dot.failed {
-  background: #c62828;
+  background: var(--danger);
 }
 
 @keyframes thinking-pulse {
@@ -227,15 +247,15 @@ body,
   padding: 6px 14px;
   font-size: 12px;
   color: #fff;
-  background: #d97757;
+  background: var(--primary);
   border: none;
   border-radius: 999px;
   cursor: pointer;
-  box-shadow: 0 4px 16px rgba(31, 30, 29, 0.18);
+  box-shadow: 0 4px 16px rgba(28, 29, 38, 0.18);
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
 
 .jump-to-bottom:hover {
-  background: #c8664a;
+  background: var(--primary-hover);
   transform: translateY(-1px);
 }

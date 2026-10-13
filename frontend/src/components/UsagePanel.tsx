@@ -4,17 +4,17 @@ import { ReloadOutlined } from "@ant-design/icons";
 import { api, type UsageSummary } from "../lib/api";
 
 const C = {
-  bg: "#faf9f5",
-  card: "#f7f5ef",
-  border: "#e8e6dc",
-  text: "#3f3b33",
-  sub: "#6e6a63",
-  faint: "#8a857b",
-  orange: "#d97757",
-  deepOrange: "#b8603e",
-  red: "#cf3d2e",
-  green: "#4c9d6e",
-  track: "#ebe7dc",
+  bg: "#f7f7fb",
+  card: "#f6f6fc",
+  border: "#e4e5ee",
+  text: "#1c1d26",
+  sub: "#5f6170",
+  faint: "#8b8da0",
+  orange: "#5b5bd6",
+  deepOrange: "#4f46e5",
+  red: "#dc2626",
+  green: "#16a34a",
+  track: "#e4e5ee",
 };
 
 function fmt(n: number) {
@@ -51,7 +51,7 @@ function SpentBar({ spent, budget }: { spent: number; budget: number | null }) {
             width: `${p}%`,
             borderRadius: 3,
             background:
-              p >= 100 ? C.red : `linear-gradient(90deg, #e0895f, ${barColor(p)})`,
+              p >= 100 ? C.red : `linear-gradient(90deg, #6d6ae0, ${barColor(p)})`,
           }}
         />
       </div>
@@ -137,9 +137,9 @@ export default function UsagePanel() {
 
   const status = b.over ? "over" : b.warning ? "warn" : "ok";
   const statusMeta = {
-    ok: { text: "预算正常", color: C.green, bg: "#e9f4ec" },
-    warn: { text: "接近预算", color: C.deepOrange, bg: "#fbeede" },
-    over: { text: "已超预算", color: C.red, bg: "#fbe9e7" },
+    ok: { text: "预算正常", color: C.green, bg: "#e9f6ee" },
+    warn: { text: "接近预算", color: C.deepOrange, bg: "#eef0fe" },
+    over: { text: "已超预算", color: C.red, bg: "#fdecea" },
   }[status];
 
   return (
@@ -197,8 +197,8 @@ export default function UsagePanel() {
                   display: "flex",
                   justifyContent: "space-between",
                   padding: "4px 2px",
-                  borderTop: i === 0 ? "1px solid #f0eee6" : "none",
-                  borderBottom: "1px solid #f0eee6",
+                  borderTop: i === 0 ? "1px solid #eef0f6" : "none",
+                  borderBottom: "1px solid #eef0f6",
                 }}
               >
                 <Typography.Text style={{ fontSize: 11, color: C.faint }}>{m}</Typography.Text>

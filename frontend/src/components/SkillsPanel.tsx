@@ -21,7 +21,7 @@ export default function SkillsPanel() {
         style={{ marginTop: 40 }}
         image={Empty.PRESENTED_IMAGE_SIMPLE}
         description={
-          <span style={{ fontSize: 12, color: "#8a857b" }}>
+          <span style={{ fontSize: 12, color: "#8b8da0" }}>
             暂无 Skill
             <br />
             在 ~/.config/myopencode/skills/ 或 .myopencode/skills/ 放置 SKILL.md
@@ -50,7 +50,7 @@ export default function SkillsPanel() {
               </Tag>
             </div>
             <Typography.Text
-              style={{ fontSize: 12, color: "#8a857b", display: "block", marginTop: 2 }}
+              style={{ fontSize: 12, color: "#8b8da0", display: "block", marginTop: 2 }}
             >
               {s.description}
             </Typography.Text>

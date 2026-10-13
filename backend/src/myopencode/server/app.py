@@ -50,7 +50,7 @@ from ..skills.registry import SkillRegistry, scan_skills
 from ..tools.rag_search import RagSearchTool
 from ..tools.registry import ToolRegistry
 from ..tools.sandbox import Sandbox
-from .routes import crash, diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace, rag
+from .routes import crash, diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace, rag, ui
 from .ws import manager, websocket_endpoint
 
 
@@ -205,6 +205,7 @@ def create_app(
     app.include_router(diagnostics.router)
     app.include_router(crash.router)
     app.include_router(rag.router)
+    app.include_router(ui.router)
 
     @app.websocket("/ws")
     async def ws_route(ws: WebSocket) -> None:

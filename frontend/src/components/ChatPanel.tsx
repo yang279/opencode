@@ -223,12 +223,12 @@ export default function ChatPanel({ messages, thinking, running, onSend, onCance
                     display: "inline-flex",
                     alignItems: "center",
                     gap: 6,
-                    background: "#f0eee6",
-                    border: "1px solid #e8e6dc",
+                    background: "#eef0f6",
+                    border: "1px solid #e4e5ee",
                     borderRadius: 8,
                     padding: "3px 8px",
                     fontSize: 12,
-                    color: "#4a463f",
+                    color: "#5f6170",
                     maxWidth: 260,
                   }}
                 >
@@ -243,7 +243,7 @@ export default function ChatPanel({ messages, thinking, running, onSend, onCance
                   </span>
                   <CloseOutlined
                     onClick={() => removeAttachment(a.id)}
-                    style={{ fontSize: 10, color: "#8a857b", cursor: "pointer" }}
+                    style={{ fontSize: 10, color: "#8b8da0", cursor: "pointer" }}
                   />
                 </span>
               ))}
@@ -267,10 +267,10 @@ export default function ChatPanel({ messages, thinking, running, onSend, onCance
               alignItems: "flex-end",
               gap: 8,
               background: "#ffffff",
-              border: "1px solid #e8e6dc",
+              border: "1px solid #d2d3e0",
               borderRadius: 18,
               padding: "8px 8px 8px 12px",
-              boxShadow: "0 2px 16px rgba(31, 30, 29, 0.06)",
+              boxShadow: "0 2px 16px rgba(28, 29, 38, 0.08)",
             }}
           >
             <Button
@@ -278,7 +278,7 @@ export default function ChatPanel({ messages, thinking, running, onSend, onCance
               icon={<PlusOutlined />}
               onClick={() => fileInputRef.current?.click()}
               title="添加文件"
-              style={{ flexShrink: 0, border: "none", background: "#f0eee6", color: "#4a463f" }}
+              style={{ flexShrink: 0, border: "none", background: "#eef0f6", color: "#5f6170" }}
             />
             <Input.TextArea
               value={input}
@@ -303,7 +303,7 @@ export default function ChatPanel({ messages, thinking, running, onSend, onCance
               style={{ flexShrink: 0 }}
             />
           </div>
-          <div style={{ textAlign: "center", fontSize: 12, color: "#8a857b", marginTop: 10 }}>
+          <div style={{ textAlign: "center", fontSize: 12, color: "#8b8da0", marginTop: 10 }}>
             Agent 可以读写文件、执行命令，操作前会请求确认
           </div>
         </div>

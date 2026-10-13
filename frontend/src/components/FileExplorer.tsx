@@ -43,7 +43,7 @@ export default function FileExplorer() {
 
   return (
     <div style={{ padding: 14, height: "100%", overflow: "auto" }}>
-      <Typography.Text style={{ fontSize: 12, color: "#6e6a63" }}>
+      <Typography.Text style={{ fontSize: 12, color: "#5f6170" }}>
         工作区文件
       </Typography.Text>
       <Tree
