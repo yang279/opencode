@@ -1,0 +1,26 @@
+title = "myopencode gitleaks config"
+
+[extend]
+useDefault = true
+
+# Singular [allowlist] is kept for backwards compatibility with older
+# gitleaks-action versions (the plural [[allowlists]] form requires v8.25+).
+[allowlist]
+description = "dev placeholders, example configs, test fixtures and build artifacts"
+paths = [
+  '''^examples/''',
+  '''^backend/tests/''',
+  '''^docs/''',
+  '''^frontend/dist/''',
+  '''(^|/)node_modules/''',
+  '''(^|/)target/''',
+  '''(^|/)\.venv''',
+  '''README\.md$''',
+]
+stopwords = [
+  "dev-token",
+  "sk-...",
+  "sk-ant-...",
+  "your-api-key",
+  "your_api_key",
+]

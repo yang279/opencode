@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Desktop AI coding agent (Tauri shell)"
 authors = ["you"]
 edition = "2021"
+publish = false
 
 [lib]
 name = "myopencode_lib"

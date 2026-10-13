@@ -172,9 +172,20 @@ cd frontend && npm test && npm run build
 
 # 评测（需已配置 provider）：离线跑黄金集，产出 pass rate
 cd backend && .venv/bin/python -m myopencode.evals.run_evals
+
+# 安全红队评测（提示注入/越狱/凭证外泄/高危破坏）：只跑 security 标签集
+cd backend && .venv/bin/python -m myopencode.evals.run_evals --tag security
 ```
 
 CI 已配置于 `.github/workflows/ci.yml`（ruff+pytest / npm build+test / cargo check 三路并行）。
+
+安全扫描独立于 `.github/workflows/security.yml`（每周定时 + push/PR 触发）：
+
+- Python：`pip-audit`（依赖漏洞）
+- Node：`npm audit --omit=dev`（生产依赖 high/critical 阻断）+ 全量 informational
+- Rust：`cargo-deny`（advisories + license + bans，配置见 `src-tauri/deny.toml`）
+- secret：`gitleaks`（配置见 `.gitleaks.toml`）
+- SBOM：`anchore/sbom-action`（syft，SPDX JSON 产物）
 
 ## 崩溃日志
 
@@ -195,5 +206,5 @@ Rust 主进程 panic 与前端未捕获异常（`error` / `unhandledrejection`�
 - [ ] RAG / 知识库 + 语义缓存
 - [ ] 自动更新（Tauri updater）
 - [ ] `edit_file` diff 的可视化渲染增强
-- [ ] 依赖漏洞扫描 / SBOM、CI 接入 secret scan（gitleaks）
+- [x] 依赖漏洞扫描 / SBOM、CI 接入 secret scan（gitleaks）
 - [ ] 代码签名 + 公证（需 Apple Developer 证书）

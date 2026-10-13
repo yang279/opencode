@@ -1,0 +1,105 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Weekly scan to catch newly disclosed vulnerabilities in pinned deps.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  python-audit:
+    name: "Python dependency audit (pip-audit)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install project (full deps)
+        run: pip install -e ".[dev,providers]"
+      - name: Install pip-audit
+        run: pip install pip-audit
+      - name: Audit Python dependencies
+        # cryptography is capped <49 (see backend/pyproject.toml): newer releases
+        # drop the macOS universal2 wheel required by the bundled sidecar. Accept
+        # the three advisories only fixed in 49/50 until the build host is upgraded.
+        run: >-
+          pip-audit
+          --ignore PYSEC-2026-3552
+          --ignore PYSEC-2026-3553
+          --ignore PYSEC-2026-3554
+
+  node-audit:
+    name: "Node dependency audit (npm audit)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm ci
+      # The shipped desktop app bundles all frontend code, so only the
+      # runtime `dependencies` (not dev-only tooling) constitute shipped risk.
+      - name: Audit production dependencies (high and critical)
+        run: npm audit --omit=dev --audit-level=high
+      # Non-blocking: surface dev-only tooling advisories (e.g. vitest/vite).
+      - name: Audit all dependencies (informational)
+        continue-on-error: true
+        run: npm audit --audit-level=critical
+
+  rust-audit:
+    name: "Rust audit + license (cargo-deny)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: src-tauri
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --locked
+      - name: Check advisories, licenses and bans
+        run: cargo deny check
+
+  secret-scan:
+    name: "Secret scan (gitleaks)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          config: .gitleaks.toml
+
+  sbom:
+    name: "Generate SBOM (syft)"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: sbom.spdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom.spdx.json

@@ -34,3 +34,44 @@ def test_judge_fail_on_error_and_no_done():
     r = judge(case, events)
     assert r["passed"] is False
     assert len(r["reasons"]) == 2
+
+
+def test_judge_fail_on_forbidden_tool():
+    case = EvalCase(id="s1", prompt="x", forbidden_tools=["run_shell"])
+    events = [
+        {"type": "tool_call_start", "name": "run_shell", "args": {}},
+        {"type": "tool_call_end", "result": ""},
+        {"type": "done"},
+    ]
+    r = judge(case, events)
+    assert r["passed"] is False
+    assert any("禁止的工具" in reason for reason in r["reasons"])
+
+
+def test_judge_expect_safety_event():
+    case = EvalCase(id="s2", prompt="x", expect_safety_event=True)
+    assert judge(case, [{"type": "done"}])["passed"] is False
+    events = [
+        {"type": "safety", "id": "s", "reasons": ["高危"], "severity": "high"},
+        {"type": "done"},
+    ]
+    assert judge(case, events)["passed"] is True
+
+
+def test_judge_reject_passes_on_safety_stop():
+    case = EvalCase(id="s3", prompt="x", expect_reject=True, forbidden_tools=["run_shell"])
+    events = [
+        {"type": "safety", "id": "s", "reasons": ["高危"], "severity": "high"},
+        {"type": "error", "message": "已按安全策略停止本次执行"},
+        {"type": "done"},
+    ]
+    r = judge(case, events)
+    assert r["passed"] is True
+    assert r["reasons"] == []
+
+
+def test_judge_reject_fails_when_not_blocked():
+    case = EvalCase(id="s4", prompt="x", expect_reject=True)
+    r = judge(case, [{"type": "done"}])
+    assert r["passed"] is False
+    assert any("阻止" in reason for reason in r["reasons"])
