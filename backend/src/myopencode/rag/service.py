@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import os
 import re
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,8 @@ from .embedder import Embedder
 from .extract import extract_text, file_ext
 from .reranker import Reranker
 from .store import RagStore
+
+_logger = logging.getLogger("myopencode.rag")
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -54,8 +57,8 @@ class RagService:
         if existing:
             return {"name": name, "doc_id": existing, "chunks": 0, "skipped": True, "error": "已存在（内容相同）"}
 
-        text = extract_text(name, data, self.allowed)
-        if not text.strip():
+        text = self._extract_safe(name, data)
+        if not text or not text.strip():
             return {"name": name, "skipped": True, "error": "未提取到文本"}
 
         kind = self._clean_kind(ext)
@@ -78,6 +81,13 @@ class RagService:
         await self._embed_and_store(inserted)
         self._reload_index()
         return {"name": name, "doc_id": doc_id, "chunks": len(chunks), "skipped": False}
+
+    def _extract_safe(self, name: str, data: bytes) -> str:
+        try:
+            return extract_text(name, data, self.allowed)
+        except Exception as exc:
+            _logger.warning("rag.extract_failed", extra={"file": name, "error": str(exc)})
+            return ""
 
     def list_documents(self) -> List[Dict[str, Any]]:
         return self.store.list_documents()
@@ -104,7 +114,11 @@ class RagService:
     async def _embed_and_store(self, rows: List[Dict[str, Any]]) -> None:
         if self.embedder is None or not self.embedder.available or not rows:
             return
-        vecs = await self.embedder.embed([r["text"] for r in rows])
+        try:
+            vecs = await self.embedder.embed([r["text"] for r in rows])
+        except Exception as exc:
+            _logger.warning("rag.embed_failed", extra={"error": str(exc)})
+            return  # 向量化失败不中断：chunk 保持 NULL，BM25 仍可检索
         for r, v in zip(rows, vecs):
             self.store.update_embedding(r["id"], np.asarray(v, dtype=np.float32).tobytes())
 
@@ -135,7 +149,11 @@ class RagService:
             return []
         if self.embedder is None or not self.embedder.available:
             return []
-        vecs = await self.embedder.embed([query])
+        try:
+            vecs = await self.embedder.embed([query])
+        except Exception as exc:
+            _logger.warning("rag.embed_query_failed", extra={"error": str(exc)})
+            return []
         if not vecs:
             return []
         qv = np.asarray(vecs[0], dtype=np.float32)

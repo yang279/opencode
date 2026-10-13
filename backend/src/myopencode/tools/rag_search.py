@@ -9,7 +9,7 @@ from .base import ToolResult
 class RagSearchTool:
     name = "rag_search"
     description = "在本地知识库中检索与查询相关的文档片段，返回最相关的内容。"
-    category = "read"
+    category = "rag"
     json_schema: Dict[str, Any] = {
         "type": "object",
         "properties": {

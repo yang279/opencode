@@ -32,11 +32,18 @@ export default function KnowledgeBasePanel() {
       const r = await api.ragUpload(files);
       const done = r.results.filter((x) => !x.skipped).length;
       const skipped = r.results.filter((x) => x.skipped).length;
+      const errors = r.results.filter((x) => x.error).map((x) => `${x.name}: ${x.error}`);
       if (done > 0) message.success(`已索引 ${done} 个文档`);
       if (skipped > 0) message.warning(`${skipped} 个文档跳过（重复或无法解析）`);
+      if (errors.length > 0) {
+        message.error(
+          errors.slice(0, 3).join("；") + (errors.length > 3 ? ` 等 ${errors.length} 个` : ""),
+          5,
+        );
+      }
       refresh();
-    } catch {
-      message.error("上传失败");
+    } catch (err) {
+      message.error(`上传失败：${err instanceof Error ? err.message : String(err)}`);
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";

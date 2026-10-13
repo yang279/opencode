@@ -70,6 +70,13 @@ _ASK_USER_GUIDANCE = (
     "multi 设为 true 允许多选），让用户点选或自填。"
 )
 
+# RAG 工具引导：让模型在涉及项目背景/领域知识时先检索本地知识库
+_RAG_GUIDANCE = (
+    "你有本地知识库检索能力（rag_search 工具）。"
+    "当用户的问题涉及项目背景、业务逻辑、领域知识、历史方案或你无法只凭代码直接确定的信息时，"
+    "先调用 rag_search 检索知识库，再结合检索结果作答；检索不到相关内容时照常回答。"
+)
+
 # 事件发送回调：把事件 dict 推给前端
 EventSink = Callable[[Dict[str, Any]], Awaitable[None]]
 
@@ -944,6 +951,9 @@ class Agent:
 
         if state.rag_section:
             prompt = (prompt + "\n\n" + state.rag_section) if prompt else state.rag_section
+
+        if self._rag is not None:
+            prompt = (prompt + "\n\n" + _RAG_GUIDANCE) if prompt else _RAG_GUIDANCE
 
         prompt = (prompt + "\n" + _ASK_USER_GUIDANCE) if prompt else _ASK_USER_GUIDANCE
 

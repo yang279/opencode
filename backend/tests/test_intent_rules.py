@@ -14,6 +14,8 @@ from myopencode.intent.schema import (
     Intent,
 )
 from myopencode.intent.semantic import SemanticRecognizer
+from myopencode.intent.tool_select import ToolRecognizer
+from myopencode.intent.schema import CATEGORY_QUESTION, CATEGORY_CHAT
 from myopencode.llm.base import LLMEvent
 
 
@@ -67,3 +69,23 @@ def test_parse_fallback_non_json():
     # 非 JSON 输出也能按类别名兜底抽取
     intent = asyncio.run(_recognize(FakeProvider("分类结果：code_edit"), "这段文字再打磨一下"))
     assert intent.category == CATEGORY_CODE_EDIT
+
+
+def test_rag_search_tool_always_available():
+    # rag_search 属于常开组，即使 question/chat 意图（工具组为空）也必须保留
+    tools_meta = [
+        {"name": "rag_search", "category": "rag", "description": ""},
+        {"name": "read_file", "category": "read", "description": ""},
+        {"name": "run_shell", "category": "execute", "description": ""},
+    ]
+    rec = ToolRecognizer(IntentConfig())
+    ctx = RecognitionContext(session=Session(session_id="s"), user_message="x", tools_meta=tools_meta)
+
+    for category in (CATEGORY_QUESTION, CATEGORY_CHAT, CATEGORY_CODE_READ):
+        intent = asyncio.run(rec.recognize(ctx, Intent(category=category)))
+        assert "rag_search" in intent.tool_names, "{} 意图下 rag_search 应常开".format(category)
+
+    # question 意图下 read/execute 工具仍被剪枝，不会被误放行
+    intent = asyncio.run(rec.recognize(ctx, Intent(category=CATEGORY_QUESTION)))
+    assert "read_file" not in intent.tool_names
+    assert "run_shell" not in intent.tool_names

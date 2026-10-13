@@ -36,12 +36,13 @@ GROUP_MEMORY = "memory"
 GROUP_MCP = "mcp"
 GROUP_INTERRUPT = "interrupt"
 GROUP_PLAN = "plan"
+GROUP_RAG = "rag"
 
 # 破坏性工具组（安全 gating 时，仅 code_edit / execute 类意图才允许）
 DESTRUCTIVE_GROUPS = [GROUP_WRITE, GROUP_EXECUTE, GROUP_MCP]
 
-# 常开组：无论什么意图都保留（含 plan/delegate 等编排工具）
-ALWAYS_GROUPS = [GROUP_SKILL, GROUP_MEMORY, GROUP_INTERRUPT, GROUP_PLAN]
+# 常开组：无论什么意图都保留（含 plan/delegate 等编排工具 + rag_search 检索）
+ALWAYS_GROUPS = [GROUP_SKILL, GROUP_MEMORY, GROUP_INTERRUPT, GROUP_PLAN, GROUP_RAG]
 
 # 意图 → 允许的工具组（skill/memory 由 ToolRecognizer 额外追加）
 INTENT_TO_TOOL_GROUPS: Dict[str, List[str]] = {

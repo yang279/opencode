@@ -210,3 +210,26 @@ def test_service_search_empty(tmp_path):
     cfg = RagConfig(docs_dir=str(tmp_path / "docs"), index_file=str(tmp_path / "index.sqlite3"))
     svc = RagService(cfg)
     assert asyncio.run(svc.search("什么都不存在的查询")) == []
+
+
+class _BoomEmbedder:
+    available = True
+
+    async def embed(self, texts):
+        raise RuntimeError("embeddings endpoint unavailable")
+
+
+def test_service_upload_embed_failure_falls_back(tmp_path):
+    cfg = RagConfig(docs_dir=str(tmp_path / "docs"), index_file=str(tmp_path / "index.sqlite3"))
+    svc = RagService(cfg, embedder=_BoomEmbedder(), reranker=_FakeReranker())
+    r = asyncio.run(svc.upload("a.txt", "苹果是一种水果。".encode()))
+    assert r["skipped"] is False and r["chunks"] >= 1
+    results = asyncio.run(svc.search("苹果"))
+    assert any("苹果" in x["text"] for x in results)
+
+
+def test_service_upload_corrupt_file_skips(tmp_path):
+    cfg = RagConfig(docs_dir=str(tmp_path / "docs"), index_file=str(tmp_path / "index.sqlite3"))
+    svc = RagService(cfg)
+    r = asyncio.run(svc.upload("bad.pdf", b"not a pdf at all"))
+    assert r["skipped"] is True and "error" in r

@@ -15,10 +15,12 @@ class Embedder:
         model: str = "text-embedding-3-large",
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
+        timeout: float = 30.0,
     ) -> None:
         self.model = model
         self._api_key = api_key
         self._base_url = base_url
+        self._timeout = timeout
         self._client = None
 
     @property
@@ -29,7 +31,7 @@ class Embedder:
         if self._client is None:
             from openai import AsyncOpenAI
 
-            kwargs: dict = {}
+            kwargs: dict = {"timeout": self._timeout}
             if self._api_key:
                 kwargs["api_key"] = self._api_key
             if self._base_url:
