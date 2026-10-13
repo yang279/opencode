@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { WsClient } from "../lib/wsClient";
 import { api, type MessageRecord, type SessionMeta } from "../lib/api";
-import type { ChatMessage, ThinkingEntry } from "../types/events";
+import type { Attachment, ChatMessage, ThinkingEntry } from "../types/events";
 
 export interface TerminalLine {
   id: string;
@@ -16,7 +16,7 @@ function recordToChatMessages(records: MessageRecord[]): ChatMessage[] {
   const out: ChatMessage[] = [];
   for (const r of records) {
     if (r.role === "user") {
-      out.push({ id: genId(), role: "user", content: r.content });
+      out.push({ id: genId(), role: "user", content: r.content, attachments: r.attachments });
     } else if (r.role === "assistant" && r.content) {
       out.push({ id: genId(), role: "assistant", content: r.content });
     } else if (r.role === "tool") {
@@ -93,25 +93,31 @@ export function useAgent() {
   }, []);
 
   const dispatchMessage = useCallback(
-    (content: string, sid: string) => {
+    (content: string, sid: string, attachments?: Attachment[]) => {
       const text = content.trim();
-      if (!text || !sid) return;
+      const atts = attachments?.length ? attachments : undefined;
+      if ((!text && !atts) || !sid) return;
       streamingBySessionRef.current[sid] = null;
       setError(null);
       setThinkingBySession((prev) => ({ ...prev, [sid]: [] }));
       appendToSession(sid, (prev) => [
         ...prev,
-        { id: genId(), role: "user", content: text },
+        { id: genId(), role: "user", content: text, attachments: atts },
       ]);
       setSessions((prev) =>
         prev.map((s) =>
           s.id === sid && (!s.title || s.title === "新对话")
-            ? { ...s, title: text.slice(0, 30) }
+            ? { ...s, title: (text || atts?.[0]?.name || "").slice(0, 30) || "新对话" }
             : s,
         ),
       );
       setSessionRunning(sid, true);
-      clientRef.current?.send({ type: "user_message", session_id: sid, content: text });
+      clientRef.current?.send({
+        type: "user_message",
+        session_id: sid,
+        content: text,
+        ...(atts ? { attachments: atts } : {}),
+      });
     },
     [appendToSession, setSessionRunning],
   );
@@ -187,8 +193,11 @@ export function useAgent() {
       if (ev.type !== "approval_request") return;
       const sid = ev.session_id;
       if (!sid) return;
+      streamingBySessionRef.current[sid] = null;
       appendToSession(sid, (prev) => [
-        ...prev,
+        ...prev.map((m) =>
+          m.role === "assistant" && m.streaming ? { ...m, streaming: false } : m,
+        ),
         { id: ev.id, role: "approval", tool: ev.tool, args: ev.args, message: ev.message, status: "pending" },
       ]);
     });
@@ -197,8 +206,11 @@ export function useAgent() {
       if (ev.type !== "ask_user") return;
       const sid = ev.session_id;
       if (!sid) return;
+      streamingBySessionRef.current[sid] = null;
       appendToSession(sid, (prev) => [
-        ...prev,
+        ...prev.map((m) =>
+          m.role === "assistant" && m.streaming ? { ...m, streaming: false } : m,
+        ),
         {
           id: ev.id,
           role: "ask_user",
@@ -214,8 +226,11 @@ export function useAgent() {
       if (ev.type !== "safety") return;
       const sid = ev.session_id;
       if (!sid) return;
+      streamingBySessionRef.current[sid] = null;
       appendToSession(sid, (prev) => [
-        ...prev,
+        ...prev.map((m) =>
+          m.role === "assistant" && m.streaming ? { ...m, streaming: false } : m,
+        ),
         { id: ev.id, role: "safety", reasons: ev.reasons, severity: ev.severity, status: "pending" },
       ]);
     });
@@ -480,9 +495,11 @@ export function useAgent() {
 
   // ── 消息/审批/取消 ──────────────────────────────────────
   const sendMessage = useCallback(
-    (content: string): boolean => {
+    (content: string, attachments?: Attachment[]): boolean => {
       const text = content.trim();
-      if (!text || !activeSessionId) return false;
+      if ((!text && (!attachments || attachments.length === 0)) || !activeSessionId) {
+        return false;
+      }
       if (text === "/undo" || text.startsWith("/undo ")) {
         api
           .undo(activeSessionId)
@@ -500,7 +517,7 @@ export function useAgent() {
         pushTerminal("err", "任务执行中，请先停止当前任务");
         return false;
       }
-      dispatchMessage(text, activeSessionId);
+      dispatchMessage(text, activeSessionId, attachments);
       return true;
     },
     [activeSessionId, pushTerminal, dispatchMessage],

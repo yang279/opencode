@@ -142,6 +142,7 @@ export interface MessageRecord {
   tool_calls?: unknown[];
   tool_call_id?: string;
   name?: string;
+  attachments?: { name: string; media_type: string; data_b64: string }[];
 }
 
 export interface SessionMessages {
@@ -207,6 +208,12 @@ export const api = {
     request<{ path: string; content?: string; error?: string }>(
       `/workspace/file?path=${encodeURIComponent(path)}`,
     ),
+  extractPdf: (data_b64: string) =>
+    request<{ text?: string; error?: string }>("/workspace/extract-pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ data_b64 }),
+    }),
   getSkills: () => request<SkillMeta[]>("/skills"),
   getTools: () => request<ToolMeta[]>("/tools"),
   listSessions: () => request<SessionMeta[]>("/sessions"),

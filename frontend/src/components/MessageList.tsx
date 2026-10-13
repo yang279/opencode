@@ -11,8 +11,9 @@ import {
   CloseOutlined,
   WarningOutlined,
   QuestionCircleOutlined,
+  PaperClipOutlined,
 } from "@ant-design/icons";
-import type { ChatMessage, ThinkingEntry } from "../types/events";
+import type { Attachment, ChatMessage, ThinkingEntry } from "../types/events";
 
 function Diff({ diff }: { diff: string }) {
   if (!diff) return null;
@@ -412,6 +413,90 @@ function SafetyCard({
   );
 }
 
+function b64ToText(b64: string): string {
+  try {
+    const bin = atob(b64);
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
+function AttachmentList({ attachments }: { attachments?: Attachment[] }) {
+  if (!attachments || attachments.length === 0) return null;
+  return (
+    <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+      {attachments.map((a, i) => {
+        const isText = a.media_type.startsWith("text/");
+        const isImage = a.media_type.startsWith("image/");
+        const isPdf = a.media_type === "application/pdf";
+        return (
+          <Collapse
+            ghost
+            size="small"
+            key={`${a.name}_${i}`}
+            items={[
+              {
+                key: `${i}`,
+                label: (
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#6e6a63", fontSize: 12 }}>
+                    <PaperClipOutlined style={{ fontSize: 12 }} />
+                    {a.name}
+                  </span>
+                ),
+                children: (() => {
+                  if (isText) {
+                    return (
+                      <pre
+                        style={{
+                          margin: 0,
+                          fontSize: 12,
+                          color: "#1f1e1d",
+                          whiteSpace: "pre-wrap",
+                          background: "#faf9f5",
+                          border: "1px solid #eeece3",
+                          borderRadius: 8,
+                          padding: "8px 10px",
+                          maxHeight: 320,
+                          overflow: "auto",
+                        }}
+                      >
+                        {b64ToText(a.data_b64)}
+                      </pre>
+                    );
+                  }
+                  if (isImage) {
+                    return (
+                      <img
+                        src={`data:${a.media_type};base64,${a.data_b64}`}
+                        alt={a.name}
+                        style={{ maxWidth: "100%", borderRadius: 8 }}
+                      />
+                    );
+                  }
+                  if (isPdf) {
+                    return (
+                      <span style={{ fontSize: 12, color: "#8a857b" }}>
+                        PDF 附件（已发送给模型，此处不预览）
+                      </span>
+                    );
+                  }
+                  return (
+                    <span style={{ fontSize: 12, color: "#8a857b" }}>
+                      {a.media_type} 附件
+                    </span>
+                  );
+                })(),
+              },
+            ]}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function ContentFlag({ m }: { m: Extract<ChatMessage, { role: "content_flag" }> }) {
   return (
     <div
@@ -601,6 +686,7 @@ export default function MessageList({
             )}
             {m.streaming && <LoadingOutlined style={{ marginLeft: 6, color: "#b8562f" }} />}
           </div>
+          <AttachmentList attachments={m.attachments} />
         </div>
       </div>,
     );

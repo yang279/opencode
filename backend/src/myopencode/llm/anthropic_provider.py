@@ -51,7 +51,7 @@ class AnthropicProvider:
             if m.role == "system":
                 system += m.content + "\n"
                 continue
-            entry: dict = {"role": m.role, "content": m.content}
+            entry: dict = {"role": m.role, "content": m.content_parts("anthropic")}
             normalized.append(entry)
 
         sampling: dict = {}

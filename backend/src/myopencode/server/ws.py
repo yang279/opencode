@@ -91,6 +91,7 @@ class ConnectionManager:
         etype = data.get("type")
         if etype == E.EVENT_USER_MESSAGE:
             content = data.get("content", "")
+            attachments = data.get("attachments") or []
             session_id = data.get("session_id", "")
             if self._agent is None or self._sessions is None:
                 await self.broadcast(E.error("后端尚未就绪"))
@@ -109,7 +110,9 @@ class ConnectionManager:
                     "user_message",
                     content_hash="sha256:" + hashlib.sha256(content.encode()).hexdigest()[:16],
                 )
-            task = asyncio.create_task(self._agent.run(session, content))
+            task = asyncio.create_task(
+                self._agent.run(session, content, list(attachments))
+            )
             task.add_done_callback(partial(self._on_task_done, session_id))
             self._tasks[session_id] = task
         elif etype == E.EVENT_TOOL_APPROVAL:

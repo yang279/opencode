@@ -1,7 +1,13 @@
 // 前后端事件类型定义（与 backend/src/myopencode/core/events.py 对齐）
 
+export interface Attachment {
+  name: string;
+  media_type: string;
+  data_b64: string;
+}
+
 export type ClientEvent =
-  | { type: "user_message"; session_id: string; content: string }
+  | { type: "user_message"; session_id: string; content: string; attachments?: Attachment[] }
   | { type: "tool_approval"; id: string; decision: "once" | "always" | "reject" }
   | { type: "ask_user_reply"; id: string; answer: string }
   | { type: "safety_reply"; id: string; decision: "continue" | "abort" }
@@ -185,7 +191,13 @@ export interface ThinkingEntry {
 
 // ── UI 消息模型 ────────────────────────────────────────────
 export type ChatMessage =
-  | { id: string; role: "user" | "assistant"; content: string; streaming?: boolean }
+  | {
+      id: string;
+      role: "user" | "assistant";
+      content: string;
+      streaming?: boolean;
+      attachments?: Attachment[];
+    }
   | {
       id: string;
       role: "tool";

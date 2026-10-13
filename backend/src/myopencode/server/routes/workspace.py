@@ -1,12 +1,29 @@
 """工作区文件浏览与读取（受 working_dir scope 约束）。"""
 from __future__ import annotations
 
+import base64
+import io
 import os
 from typing import Dict, List
 
 from fastapi import APIRouter, Request
+from pydantic import BaseModel
 
 router = APIRouter()
+
+
+class ExtractPdfRequest(BaseModel):
+    data_b64: str
+
+
+def _extract_pdf_text(data_b64: str) -> str:
+    """用 pypdf 内存解析 PDF 并抽取全文（不落盘）。"""
+    from pypdf import PdfReader
+
+    raw = base64.b64decode(data_b64)
+    reader = PdfReader(io.BytesIO(raw))
+    pages = [page.extract_text() or "" for page in reader.pages]
+    return "\n\n".join(pages).strip()
 
 
 def _scope(root: str, rel: str) -> str:
@@ -36,6 +53,15 @@ async def workspace_tree(request: Request):
     root = os.path.abspath(request.app.state.config.working_dir)
     entries = _walk(root)
     return {"root": root, "entries": entries}
+
+
+@router.post("/workspace/extract-pdf")
+async def workspace_extract_pdf(body: ExtractPdfRequest):
+    try:
+        text = _extract_pdf_text(body.data_b64)
+    except Exception as exc:
+        return {"error": "PDF 解析失败: {}".format(exc)}
+    return {"text": text}
 
 
 @router.get("/workspace/file")

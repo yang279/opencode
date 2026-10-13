@@ -127,6 +127,7 @@ export default function App() {
               messages={agent.messages}
               thinking={agent.thinking}
               running={agent.running}
+              provider={provider}
               onSend={agent.sendMessage}
               onCancel={agent.cancel}
               onRespond={agent.respondApproval}

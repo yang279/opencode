@@ -256,7 +256,12 @@ class Agent:
         event["session_id"] = session.session_id
         await self.emit(event)
 
-    async def run(self, session: Session, user_content: str) -> None:
+    async def run(
+        self,
+        session: Session,
+        user_content: str,
+        attachments: Optional[List[Dict[str, str]]] = None,
+    ) -> None:
         state = self._build_state(session)
         self._active_runs[session.session_id] = state
         try:
@@ -264,20 +269,28 @@ class Agent:
                 self._metrics.incr("agent_run_total")
             start = time.perf_counter()
             with tracing.span("agent.run", logger=_logger):
-                await self._run_impl(state, user_content)
+                await self._run_impl(state, user_content, attachments)
             if self._metrics is not None:
                 self._metrics.observe_histogram("agent_run_seconds", time.perf_counter() - start)
         finally:
             self._active_runs.pop(session.session_id, None)
 
-    async def _run_impl(self, state: RunState, user_content: str) -> None:
+    async def _run_impl(
+        self,
+        state: RunState,
+        user_content: str,
+        attachments: Optional[List[Dict[str, str]]] = None,
+    ) -> None:
         session = state.session
         state.cancelled = False
         state.rejected = False
         state.cancel_token = ProcessTracker()
-        session.append(Message(role="user", content=user_content))
+        session.append(Message(role="user", content=user_content, attachments=attachments or []))
         if not session.title or session.title == "新对话":
-            session.title = user_content.strip()[:30] or "新对话"
+            title = user_content.strip()[:30]
+            if not title and attachments:
+                title = attachments[0].get("name", "")[:30]
+            session.title = title or "新对话"
         state.active_tools = None
         state.intent_section = ""
         state.last_intent_category = None

@@ -16,6 +16,7 @@ fi
   --name myopencode-sidecar \
   --collect-all myopencode \
   --hidden-import yaml \
+  --hidden-import pypdf \
   sidecar_entry.py
 
 mkdir -p "$ROOT/src-tauri/binaries"
