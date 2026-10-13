@@ -120,6 +120,18 @@ Skill 触发：除模型自觉调用 `load_skill` 外，还支持 frontmatter `m
 - MCP 工具默认触发审批弹窗（安全起见）
 - 本地测试可用内置 mock server：`examples/mcp_servers/mock_server.py`
 
+## 知识库（RAG）
+
+上传文档到本地知识库，后台自动**抽取 → 清洗 → 分块 → 索引**（检索注入对话为下一阶段）。
+
+- 支持类型：PDF、Word(.docx)、Markdown、纯文本、代码
+- 入口：侧边栏「工具与信息 → 知识库」Tab 上传（多选）；或 `POST /rag/upload`
+- 流水线：sha256 去重 → 抽取（pypdf / python-docx）→ 清洗（去页眉页脚/断行合并，`rag.clean_pdf` 开关）→ 结构感知分块（~500 token、15% overlap）→ chunk 去重 → SQLite 索引
+- 存储：原始文件 `~/.config/myopencode/rag/docs/`，索引 `~/.config/myopencode/rag/index.sqlite3`
+- 配置：`myopencode.json` 的 `rag` 块（`enabled` / `allowed_extensions` / `chunk_size_tokens` / `clean_pdf` / `dedup` 等）
+
+> 当前阶段只做摄取与索引；向量化（`text-embedding-3-large`）与检索注入对话（提问时自动引用知识库）待接入。
+
 ## 权限与命令策略
 
 - 写文件 / `run_shell` / `run_code` / MCP 工具默认走审批弹窗（读类与记忆工具免审批）。
@@ -203,7 +215,7 @@ Rust 主进程 panic 与前端未捕获异常（`error` / `unhandledrejection`�
 
 ## 待办（下一步可做）
 
-- [ ] RAG / 知识库 + 语义缓存
+- [ ] RAG / 知识库 + 语义缓存（摄取/索引已完成，向量化 + 检索注入待做）
 - [ ] 自动更新（Tauri updater）
 - [ ] `edit_file` diff 的可视化渲染增强
 - [x] 依赖漏洞扫描 / SBOM、CI 接入 secret scan（gitleaks）

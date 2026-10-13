@@ -3,6 +3,7 @@ import SkillsPanel from "./SkillsPanel";
 import ToolsPanel from "./ToolsPanel";
 import UsagePanel from "./UsagePanel";
 import DiagnosticsPanel from "./DiagnosticsPanel";
+import KnowledgeBasePanel from "./KnowledgeBasePanel";
 
 interface Props {
   open: boolean;
@@ -27,6 +28,7 @@ export default function AuxPanelModal({ open, onClose }: Props) {
         items={[
           { key: "skills", label: "Skills", children: <SkillsPanel /> },
           { key: "tools", label: "工具", children: <ToolsPanel /> },
+          { key: "knowledge", label: "知识库", children: <KnowledgeBasePanel /> },
           { key: "usage", label: "用量预算", children: <UsagePanel /> },
           { key: "diagnostics", label: "诊断", children: <DiagnosticsPanel /> },
         ]}

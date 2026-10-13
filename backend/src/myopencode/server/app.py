@@ -33,6 +33,7 @@ from ..memory.tools import (
     RecallMemoryTool,
     SaveMemoryTool,
 )
+from ..rag.service import RagService
 from ..security.content_filter import ContentFilter
 from ..security.policy import PermissionPolicy
 from ..security.safety import SafetyGate
@@ -40,7 +41,7 @@ from ..skills.load_skill_tool import LoadSkillTool
 from ..skills.registry import SkillRegistry, scan_skills
 from ..tools.registry import ToolRegistry
 from ..tools.sandbox import Sandbox
-from .routes import crash, diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace
+from .routes import crash, diagnostics, health, memory, meta, sessions, undo, usage as usage_routes, workspace, rag
 from .ws import manager, websocket_endpoint
 
 
@@ -93,6 +94,7 @@ def create_app(
     usage.set_budget_sink(budget.record)
     reflexion = ReflexionController(config.reflexion, provider, budget=budget, metrics=metrics)
     mcp_registry = McpRegistry(config.mcp_servers, sandbox=sandbox)
+    rag_service = RagService(config.rag)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -139,6 +141,7 @@ def create_app(
     app.state.usage_store = usage_store
     app.state.budget = budget
     app.state.reflexion = reflexion
+    app.state.rag = rag_service
 
     # 组装 agent 并绑定到连接管理器（emit 广播到所有 WS 连接）
     agent = Agent(
@@ -174,6 +177,7 @@ def create_app(
     app.include_router(usage_routes.router)
     app.include_router(diagnostics.router)
     app.include_router(crash.router)
+    app.include_router(rag.router)
 
     @app.websocket("/ws")
     async def ws_route(ws: WebSocket) -> None:

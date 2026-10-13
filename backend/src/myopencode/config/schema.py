@@ -233,6 +233,61 @@ class BackupConfig:
 
 
 @dataclass
+class RagConfig:
+    """RAG 知识库配置：文档摄取、清洗、分块、向量化与检索注入。"""
+
+    enabled: bool = False
+    # 允许上传/索引的文件扩展名（小写，含点）
+    allowed_extensions: List[str] = field(
+        default_factory=lambda: [
+            ".pdf",
+            ".docx",
+            ".md",
+            ".markdown",
+            ".txt",
+            ".py",
+            ".js",
+            ".ts",
+            ".tsx",
+            ".jsx",
+            ".rs",
+            ".go",
+            ".java",
+            ".c",
+            ".cpp",
+            ".h",
+            ".cs",
+            ".rb",
+            ".sh",
+            ".yml",
+            ".yaml",
+            ".json",
+            ".toml",
+            ".html",
+            ".css",
+            ".sql",
+        ]
+    )
+    # 存储位置：原始文件与 SQLite 索引
+    docs_dir: str = "~/.config/myopencode/rag/docs"
+    index_file: str = "~/.config/myopencode/rag/index.sqlite3"
+    # 分块：目标大小 / overlap / 硬上限（token）
+    chunk_size_tokens: int = 500
+    chunk_overlap_tokens: int = 75
+    chunk_max_tokens: int = 1000
+    # 清洗：PDF/Word 专项（去页眉页脚/页码、断行合并、连字符）与 chunk 去重
+    clean_pdf: bool = True
+    dedup: bool = True
+    # 向量化与检索（后续 Phase 接入）
+    embedding_model: str = "text-embedding-3-large"
+    embedding_provider: Optional[str] = None
+    contextualize: bool = False
+    contextualize_model: Optional[str] = None
+    top_k: int = 5
+    intents_to_trigger: List[str] = field(default_factory=lambda: ["question", "chat"])
+
+
+@dataclass
 class ObservabilityConfig:
     """可观测配置：结构化日志 + 审计 + 指标。"""
 
@@ -266,6 +321,7 @@ class AppConfig:
     llm: LLMConfig = field(default_factory=LLMConfig)
     safety: SafetyConfig = field(default_factory=SafetyConfig)
     reflexion: ReflexionConfig = field(default_factory=ReflexionConfig)
+    rag: RagConfig = field(default_factory=RagConfig)
 
     def resolve_provider(self) -> str:
         return self.provider

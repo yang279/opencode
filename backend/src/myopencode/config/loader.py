@@ -20,6 +20,7 @@ from .schema import (
     PermissionsConfig,
     PlanningConfig,
     ProviderConfig,
+    RagConfig,
     SafetyConfig,
     SandboxConfig,
     SubagentPolicyConfig,
@@ -176,6 +177,7 @@ def _parse(data: Dict[str, Any]) -> AppConfig:
     cfg.subagent = _parse_subagent(data.get("subagent"))
     cfg.llm = _parse_llm(data.get("llm"))
     cfg.safety = _parse_safety(data.get("safety"))
+    cfg.rag = _parse_rag(data.get("rag"))
     return cfg
 
 
@@ -351,4 +353,27 @@ def _parse_safety(raw: Any) -> SafetyConfig:
         content_filter_enabled=bool(obj.get("content_filter_enabled", False)),
         content_filter_timeout=float(obj.get("content_filter_timeout", 10.0)),
         content_action=str(obj.get("content_action", "warn")),
+    )
+
+
+def _parse_rag(raw: Any) -> RagConfig:
+    obj = _as_dict(raw)
+    raw_exts = obj.get("allowed_extensions")
+    exts = [str(e).lower() for e in raw_exts] if raw_exts else list(RagConfig().allowed_extensions)
+    return RagConfig(
+        enabled=bool(obj.get("enabled", False)),
+        allowed_extensions=exts,
+        docs_dir=str(obj.get("docs_dir", "~/.config/myopencode/rag/docs")),
+        index_file=str(obj.get("index_file", "~/.config/myopencode/rag/index.sqlite3")),
+        chunk_size_tokens=int(obj.get("chunk_size_tokens", 500)),
+        chunk_overlap_tokens=int(obj.get("chunk_overlap_tokens", 75)),
+        chunk_max_tokens=int(obj.get("chunk_max_tokens", 1000)),
+        clean_pdf=bool(obj.get("clean_pdf", True)),
+        dedup=bool(obj.get("dedup", True)),
+        embedding_model=str(obj.get("embedding_model", "text-embedding-3-large")),
+        embedding_provider=obj.get("embedding_provider"),
+        contextualize=bool(obj.get("contextualize", False)),
+        contextualize_model=obj.get("contextualize_model"),
+        top_k=int(obj.get("top_k", 5)),
+        intents_to_trigger=list(obj.get("intents_to_trigger", ["question", "chat"])),
     )

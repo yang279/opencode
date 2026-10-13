@@ -194,6 +194,25 @@ export interface TraceSpan {
   attrs: Record<string, unknown>;
 }
 
+export interface RagDoc {
+  id: string;
+  name: string;
+  source_path: string | null;
+  sha256: string;
+  size: number;
+  ext: string;
+  chunk_count: number;
+  created_at: number;
+}
+
+export interface RagUploadResult {
+  name: string;
+  doc_id?: string;
+  chunks?: number;
+  skipped?: boolean;
+  error?: string;
+}
+
 export const api = {
   health: () => request<HealthInfo>("/health"),
   getConfig: () => request<AppConfig>("/config"),
@@ -233,6 +252,17 @@ export const api = {
       `/traces${sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : ""}`,
     ),
   diagnosticsExportUrl: async () => `${await httpBase()}/diagnostics/export`,
+  ragUpload: async (files: File[]) => {
+    const fd = new FormData();
+    for (const f of files) fd.append("files", f);
+    return request<{ results: RagUploadResult[] }>("/rag/upload", {
+      method: "POST",
+      body: fd,
+    });
+  },
+  ragDocs: () => request<{ docs: RagDoc[] }>("/rag/docs"),
+  ragDelete: (id: string) =>
+    request<{ ok: boolean }>(`/rag/docs/${id}`, { method: "DELETE" }),
   reportCrash: (payload: { message: string; stack?: string; source?: string }) =>
     request<{ ok: boolean }>("/crash", {
       method: "POST",
